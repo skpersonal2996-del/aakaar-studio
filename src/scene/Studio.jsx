@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Environment, Lightformer, SoftShadows, Sparkles } from '@react-three/drei'
+import { Environment, Lightformer, SoftShadows } from '@react-three/drei'
 import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { useStore } from '../store'
@@ -102,7 +102,6 @@ export function Studio({ onReady }) {
       <Pegboard />
       <Plants />
       <CityWindow />
-      <Sparkles count={50} scale={[9, 3.2, 7]} position={[0, 2, -0.5]} size={1.4} speed={0.15} opacity={0.25} color="#ffcf9e" noise={0.6} />
       <Hotspots />
       <ShadowSetup />
       <FrameDriver />

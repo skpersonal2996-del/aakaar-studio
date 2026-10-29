@@ -98,20 +98,17 @@ export function Credenza() {
   )
 }
 
-// A founder's studio ID on a lanyard, swaying gently.
+// A founder's studio ID on a lanyard, hanging still at a slight natural angle.
 function Card({ person, i, x }) {
-  const ref = useRef()
   const tex = useMemo(() => photoCard(person), [person])
   const len = 0.16 + i * 0.04
   const W = 0.27
   const H = 0.405
-  useFrame((s) => {
-    ref.current.rotation.z = Math.sin(s.clock.elapsedTime * 0.9 + i * 1.3) * 0.025
-  })
+  const tilt = Math.sin(i * 1.3) * 0.025
   return (
     <group position={[x, 0.36, 0.03]}>
       <Cyl args={[0.007, 0.007, 0.05]} rotation-x={Math.PI / 2} color="#bbb" metalness={0.9} roughness={0.2} />
-      <group ref={ref}>
+      <group rotation-z={tilt}>
         <Box args={[0.026, len, 0.002]} position={[0, -len / 2, 0.02]} color={person.color} roughness={0.8} />
         <Box args={[0.034, 0.034, 0.006]} position={[0, -len, 0.02]} color="#cfcfcf" metalness={0.9} />
         <group position={[0, -len - H / 2 - 0.01, 0.024]}>

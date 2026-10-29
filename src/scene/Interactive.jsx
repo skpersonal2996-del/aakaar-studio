@@ -70,14 +70,15 @@ function Hotspot({ id, position, size = 1 }) {
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime
     const g = ref.current
-    g.position.y = position[1] + Math.sin(t * 1.6 + phase) * 0.03
+    // slow, calm motion: a gentle bob, an unhurried ripple and a soft breathing core
+    g.position.y = position[1] + Math.sin(t * 0.8 + phase) * 0.03
     // kept small; the farthest markers get only a slight boost so they stay readable
     const far = THREE.MathUtils.clamp(state.camera.position.distanceTo(g.position) / 7, 1, 1.2)
     g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, visible ? (hovered ? 1.15 : 0.85) * far * size : 0, 8, dt))
-    const p = (t * 0.7 + phase) % 1
+    const p = (t * 0.35 + phase) % 1
     pulse.current.scale.setScalar(1 + p * 1.1)
     pulse.current.material.opacity = (1 - p) * 0.7
-    core.current.scale.setScalar(1 + Math.sin(t * 3 + phase) * 0.08 + (hovered ? 0.25 : 0))
+    core.current.scale.setScalar(1 + Math.sin(t * 1.5 + phase) * 0.08 + (hovered ? 0.25 : 0))
   })
 
   return (
