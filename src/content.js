@@ -162,7 +162,7 @@ export const TEAM = [
     card: 'Designer',
     color: '#7b3fe4',
     photo: asset('team/shruti.webp'),
-    note: 'Understands the human side of every product — researching, shaping flows and crafting interfaces people love to use.',
+    note: 'Understands the human side of every product — researching, shaping flows and crafting interfaces people love to use, like the one you’re exploring right now.',
   },
   {
     name: 'Vinay',
