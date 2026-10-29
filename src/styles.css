@@ -225,12 +225,30 @@ a { color: inherit; }
   background: linear-gradient(90deg, #ff9cc8 0%, #ffd3e6 55%, #fff6ef 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
+.project { display: block; color: inherit; text-decoration: none; }
 .project__thumb {
-  aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden; margin-bottom: 14px;
-  border: 1px solid var(--line); background: #1d1612;
+  position: relative; aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden; margin-bottom: 12px;
+  border: 1px solid var(--line); background: #1d1612; transition: border-color 0.3s var(--ease);
 }
-.project__thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s var(--ease); }
+.project__thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s var(--ease), filter 0.4s var(--ease); }
 .project:hover .project__thumb img { transform: scale(1.03); }
+.project--live:hover .project__thumb { border-color: rgba(255, 154, 61, 0.55); }
+.project--soon { cursor: default; }
+.project--soon:hover .project__thumb img { filter: blur(3px) brightness(0.45); }
+/* pill over the thumbnail: "Visit site ↗" on live work, "Coming soon" otherwise */
+.project__cta {
+  position: absolute; left: 50%; top: 50%; padding: 9px 16px; border-radius: 999px; white-space: nowrap;
+  font-size: 11px !important; letter-spacing: 0.14em; text-transform: uppercase; color: #1a120d;
+  background: linear-gradient(90deg, #ffb14d, #ff8fc0); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0; transform: translate(-50%, -40%); transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.project--soon .project__cta { background: rgba(20, 15, 13, 0.85); color: #ffe2c6; border: 1px solid rgba(255, 154, 61, 0.5); }
+.project:hover .project__cta, .project:focus-visible .project__cta { opacity: 1; transform: translate(-50%, -50%); }
+.project__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.project__tags span {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 9px;
+  border-radius: 999px; color: #ffd9b8; background: rgba(255, 154, 61, 0.1); border: 1px solid rgba(255, 154, 61, 0.28);
+}
 .project p { color: #cfc4bc; }
 .project__impact {
   margin-top: 14px; padding: 14px 16px; border-radius: 12px;

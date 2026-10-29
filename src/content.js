@@ -99,29 +99,35 @@ export const PROCESS = [
   },
 ]
 
-// Selected work. impact is optional and shows as a highlighted callout.
+// Selected work. tags give the gist at a glance; url opens the live product (no url shows "Coming soon").
+// impact is optional and shows as a highlighted callout.
 export const PROJECTS = [
   {
     name: 'Bridge',
     title: 'Making everyday operations easier.',
     image: asset('projects/bridge.webp'),
     alt: 'A driving school office with learner cars, cones, a checklist and a car key',
-    text: 'Digitizing manual processes is one thing. Making them intuitive, accurate, and genuinely less time-consuming for non-technical users is another. We designed the end-to-end product experience, simplifying administrative workflows and introducing automation to reduce repetitive work.',
-    impact: 'Reduced admin time by 60%, streamlined daily operations, and made business data easier to track for better decision-making.',
+    tags: ['Business software', 'Workflow automation', 'Product design'],
+    text: 'An admin platform for driving schools that turns manual paperwork into simple, automated workflows anyone on the team can use.',
+    impact: 'Admin time down 60%, with business data that’s easy to track.',
+    url: 'https://bridgedrive.in/',
   },
   {
     name: 'PrimeChat',
     title: 'Turning donations into moments worth celebrating.',
     image: asset('projects/primechat.webp'),
     alt: 'PrimeChat overlay in OBS showing a donation alert, a goal bar and recent supporters over a game',
-    text: 'Donations are more than transactions for live streamers; they’re moments of connection with their community. PrimeChat lets creators customize donation pages and alerts, bringing supporter interactions directly into their streams through OBS. The experience makes it easier to acknowledge supporters and keep them part of the show.',
+    tags: ['Live streaming', 'Creator tools', 'OBS overlays'],
+    text: 'Custom donation pages and on-stream alerts that help creators thank supporters live and keep them part of the show.',
+    url: 'https://dev.primechat.live/',
   },
   {
     name: 'DocFit',
     title: 'Documents that format themselves.',
     image: asset('projects/docfit.webp'),
     alt: 'A spreadsheet and a Word template flowing through an AI step into a stack of formatted documents',
-    text: 'Turning spreadsheet data into hundreds of consistently formatted documents shouldn’t mean hours of manual work. DocFit explores how AI can bring data and fixed document templates together, with field mapping, live previews, and conversational corrections to help preserve layouts and simplify document generation.',
+    tags: ['AI', 'Document automation', 'In progress'],
+    text: 'Spreadsheet data in, hundreds of perfectly formatted documents out — with AI keeping every template’s layout intact.',
   },
 ]
 

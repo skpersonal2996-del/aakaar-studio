@@ -8,24 +8,35 @@ import { ABOUT_STUDIO, PRINCIPLES, PROCESS, PROJECTS, SECTIONS, SERVICES, SOCIAL
 function Projects() {
   return (
     <div className="list">
-      {PROJECTS.map((p, i) => (
-        <article key={p.name} className="project">
-          <span className="project__label mono">
-            0{i + 1} / {p.name}
-          </span>
-          <h3 className="project__title">{p.title}</h3>
-          <div className="project__thumb">
-            <img src={p.image} alt={p.alt} loading="lazy" />
-          </div>
-          <p>{p.text}</p>
-          {p.impact && (
-            <div className="project__impact">
-              <span className="mono">The impact</span>
-              <p>{p.impact}</p>
+      {PROJECTS.map((p, i) => {
+        // live projects open their own site; ones without a url show "Coming soon" on hover
+        const Card = p.url ? 'a' : 'article'
+        const link = p.url ? { href: p.url, target: '_blank', rel: 'noreferrer' } : { 'aria-disabled': true }
+        return (
+          <Card key={p.name} className={`project ${p.url ? 'project--live' : 'project--soon'}`} {...link}>
+            <span className="project__label mono">
+              0{i + 1} / {p.name}
+            </span>
+            <h3 className="project__title">{p.title}</h3>
+            <div className="project__thumb">
+              <img src={p.image} alt={p.alt} loading="lazy" />
+              <span className="project__cta mono">{p.url ? 'Visit site ↗' : 'Coming soon'}</span>
             </div>
-          )}
-        </article>
-      ))}
+            <div className="project__tags">
+              {p.tags.map((t) => (
+                <span key={t}>{t}</span>
+              ))}
+            </div>
+            <p>{p.text}</p>
+            {p.impact && (
+              <div className="project__impact">
+                <span className="mono">The impact</span>
+                <p>{p.impact}</p>
+              </div>
+            )}
+          </Card>
+        )
+      })}
     </div>
   )
 }
