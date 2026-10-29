@@ -184,6 +184,37 @@ function Contact() {
 
 const BODIES = { projects: Projects, story: Story, services: Services, process: Process, about: About, contact: Contact }
 
+// Wheel scrolling glides instead of stepping: each wheel tick moves a target, and the panel
+// eases toward it. Keyboard, scrollbar and touch scrolling are left as they are.
+function useSmoothWheel(ref, key) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let target = el.scrollTop
+    let cur = el.scrollTop
+    let raf = 0
+    const step = () => {
+      cur += (target - cur) * 0.1
+      if (Math.abs(target - cur) < 0.5) cur = target
+      el.scrollTop = cur
+      raf = cur === target ? 0 : requestAnimationFrame(step)
+    }
+    const onWheel = (e) => {
+      if (e.ctrlKey) return // pinch-zoom
+      e.preventDefault()
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1
+      if (!raf) target = cur = el.scrollTop // pick up any scrolling done another way
+      target = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, target + e.deltaY * unit))
+      if (!raf) raf = requestAnimationFrame(step)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      cancelAnimationFrame(raf)
+    }
+  }, [ref, key])
+}
+
 export function Panel() {
   const active = useStore((s) => s.active)
   const close = useStore((s) => s.close)
@@ -194,6 +225,7 @@ export function Panel() {
     if (active) setShown(active)
     if (body.current) body.current.scrollTop = 0
   }, [active])
+  useSmoothWheel(body, shown)
   const s = shown && SECTIONS[shown]
   const Body = shown && BODIES[shown]
   return (

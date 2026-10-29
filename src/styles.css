@@ -283,9 +283,10 @@ a { color: inherit; }
 .tale__stroke {
   fill: none; stroke: #e9d6c3; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 1; opacity: 0.85; filter: drop-shadow(0 0 3px rgba(255, 154, 61, 0.35));
-  transition: stroke-dashoffset 0.25s linear;
 }
-.tale__pencil { transition: transform 0.25s linear; }
+/* moved every frame from Story.jsx, so no transform transition here */
+.tale__pencil { transition: opacity 0.5s var(--ease); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
+.tale__pencil.is-done { opacity: 0; }
 
 .beat { position: relative; display: grid; grid-template-columns: 1fr 52px 1fr; align-items: center; margin-bottom: 30px; }
 .beat__emoji {

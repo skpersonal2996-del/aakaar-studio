@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { STORY } from '../content'
 
-// "Our story": a pencil line winds down the middle as the panel scrolls, and the story
+// "Our story": a pencil sketches a winding line down the middle as the panel scrolls, and the story
 // unfolds beside it one small moment at a time, each with an emoji on the line for the feeling.
 
 const W = 160 // svg width; the line is centred at CX and swings either side of it
 const CX = W / 2
 const SWAY = 60 // bezier pull; the line drifts about a third of this off centre
 const END_GAP = 18 // space kept between the line's end and the "aakaar" sign
+const OPEN_BEATS = 2 // beats already sketched when the story opens; the rest wait for scrolling
+const EASE = 0.12 // how quickly the pencil catches up with the scroll each frame
+const TILT = 28 // the pencil leans like it's held in a right hand
 
 // A winding path through every emoji. Between two beats it bends away from the text it is
 // leaving and away from the text it is heading to, so it reads like a road and never cuts a line.
@@ -28,9 +31,10 @@ function journeyPath(stops, end) {
 export function Story() {
   const root = useRef()
   const stroke = useRef()
-  const [layout, setLayout] = useState(null) // { stops: emoji centre ys, end: where the line stops }
-  const [draw, setDraw] = useState({ frac: 0, x: CX, y: 0 }) // how much of the line is drawn, and its tip
-  const [shown, setShown] = useState(1) // how many beats are revealed
+  const pencil = useRef()
+  const [layout, setLayout] = useState(null) // { stops: emoji centre ys, end: where the line stops, height }
+  const [shown, setShown] = useState(0) // how many beats are revealed
+  const [done, setDone] = useState(false)
 
   // measure where the emojis and the sign sit (fonts and wrapping can move them)
   useLayoutEffect(() => {
@@ -48,7 +52,8 @@ export function Story() {
     return () => ro.disconnect()
   }, [])
 
-  // draw the line and reveal beats as the panel scrolls
+  // Scrolling sets where the pencil should be; each frame it eases toward that spot, sketching
+  // the line behind it, leaning along the curve and trembling a little while it moves.
   useEffect(() => {
     const el = root.current
     const scroller = el.closest('.panel__scroll')
@@ -66,31 +71,54 @@ export function Story() {
       }
       return hi
     }
-    const update = () => {
-      const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top
-      // the "pencil tip" sits about two thirds down the visible area
-      const tip = Math.max(0, Math.min(layout.end, scroller.clientHeight * 0.68 - top))
-      const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4
-      const len = atEnd ? total : lengthAt(tip)
-      const p = path.getPointAtLength(len)
-      setDraw({ frac: len / total, x: p.x, y: p.y })
-      let n = 0
-      layout.stops.forEach((y) => {
-        if (y - 20 < (atEnd ? Infinity : tip)) n++
-      })
-      setShown(Math.max(1, n))
+    const start = lengthAt(layout.stops[OPEN_BEATS - 1] + 26)
+
+    // the whole scroll range maps onto the rest of the line, so it always finishes at the bottom
+    let target = start
+    const aim = () => {
+      const max = scroller.scrollHeight - scroller.clientHeight
+      const f = max > 0 ? Math.min(1, scroller.scrollTop / max) : 1
+      target = start + (total - start) * f
     }
-    update()
-    scroller.addEventListener('scroll', update, { passive: true })
-    window.addEventListener('resize', update)
+
+    let cur = 0 // starts empty, so the first two beats get sketched as the story opens
+    let raf = 0
+    let lastShown = -1
+    let lastDone = null
+    const tick = (t) => {
+      const step = (target - cur) * EASE
+      cur = Math.abs(target - cur) < 0.3 ? target : cur + step
+      const p = path.getPointAtLength(cur)
+      const q = path.getPointAtLength(Math.max(0, cur - 8))
+      const dir = cur > 8 ? (Math.atan2(p.y - q.y, p.x - q.x) * 180) / Math.PI : 90
+      const speed = Math.min(1, Math.abs(step) / 4)
+      const tremble = Math.sin(t * 0.045) * 4 * speed + Math.sin(t * 0.11) * 1.5 * speed
+      const angle = TILT + (dir - 90) * 0.45 + tremble
+      path.style.strokeDashoffset = 1 - cur / total
+      pencil.current?.setAttribute('transform', `translate(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) rotate(${angle.toFixed(2)})`)
+
+      const n = layout.stops.filter((y) => y - 14 <= p.y).length
+      if (n !== lastShown) setShown((lastShown = n))
+      const isDone = cur >= total - 1
+      if (isDone !== lastDone) setDone((lastDone = isDone))
+
+      raf = cur === target ? 0 : requestAnimationFrame(tick)
+    }
+    const kick = () => {
+      aim()
+      if (!raf) raf = requestAnimationFrame(tick)
+    }
+    kick()
+    scroller.addEventListener('scroll', kick, { passive: true })
+    window.addEventListener('resize', kick)
     return () => {
-      scroller.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
+      cancelAnimationFrame(raf)
+      scroller.removeEventListener('scroll', kick)
+      window.removeEventListener('resize', kick)
     }
   }, [layout])
 
   const d = useMemo(() => (layout ? journeyPath(layout.stops, layout.end) : ''), [layout])
-  const done = draw.frac >= 0.995
 
   return (
     <div className="tale" ref={root}>
@@ -98,18 +126,16 @@ export function Story() {
         <svg className="tale__line" width={W} height={layout.height} viewBox={`0 0 ${W} ${layout.height}`} aria-hidden>
           {/* faint guide, then the drawn graphite stroke on top */}
           <path d={d} className="tale__guide" />
-          <path ref={stroke} d={d} className="tale__stroke" pathLength="1" style={{ strokeDashoffset: 1 - draw.frac }} />
-          {!done && (
-            <g transform={`translate(${draw.x}, ${draw.y})`} className="tale__pencil">
-              {/* a tiny pencil, tip down */}
-              <g transform="rotate(200) translate(-4,-26)">
-                <rect x="0" y="0" width="8" height="18" rx="1.5" fill="#ffb14d" />
-                <rect x="0" y="-4" width="8" height="5" rx="1.5" fill="#ff8fc0" />
-                <polygon points="0,18 8,18 4,26" fill="#f1d9b5" />
-                <polygon points="2.6,22.6 5.4,22.6 4,26" fill="#3a2d26" />
-              </g>
+          <path ref={stroke} d={d} className="tale__stroke" pathLength="1" style={{ strokeDashoffset: 1 }} />
+          <g ref={pencil} className={`tale__pencil ${done ? 'is-done' : ''}`} transform={`translate(${CX}, 0)`}>
+            {/* a tiny pencil with its tip on the origin, pointing down */}
+            <g transform="translate(-4,-26)">
+              <rect x="0" y="0" width="8" height="18" rx="1.5" fill="#ffb14d" />
+              <rect x="0" y="-4" width="8" height="5" rx="1.5" fill="#ff8fc0" />
+              <polygon points="0,18 8,18 4,26" fill="#f1d9b5" />
+              <polygon points="2.6,22.6 5.4,22.6 4,26" fill="#3a2d26" />
             </g>
-          )}
+          </g>
         </svg>
       )}
 
