@@ -15,7 +15,7 @@ function Loader({ ready }) {
         <p className="mono loader__tag">{STUDIO.tagline}</p>
         {ready ? (
           <>
-            <p className="mono loader__ask">Step inside —</p>
+            <p className="mono loader__ask">Step inside</p>
             <div className="loader__choices">
               <button className="btn btn--primary" onClick={() => {
                   startMusic() // inside the click, so browsers allow audio to start

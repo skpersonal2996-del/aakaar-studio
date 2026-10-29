@@ -47,7 +47,7 @@ export const SECTIONS = {
     object: 'The ID wall',
     title: 'Meet the founders',
     intro:
-      'Aakaar (आकार) means “shape”. We are a two-person digital product studio: a designer and a developer who take ideas from a rough sketch to a product people use — and share one very large desk while doing it.',
+      'Aakaar (आकार) means “shape”. We are a two-person digital product studio: a designer and a developer who take ideas from a rough sketch to a product people use, and share one very large desk while doing it.',
   },
   contact: {
     index: '06',
@@ -55,7 +55,7 @@ export const SECTIONS = {
     object: 'The phone',
     title: 'Say hello',
     intro:
-      'Have a product that needs shape? Big idea, small improvement, or something you’re still trying to figure out — we’re all ears.',
+      'Have a product that needs shape? Big idea, small improvement, or something you’re still trying to figure out. We’re all ears.',
   },
 }
 
@@ -127,7 +127,7 @@ export const PROJECTS = [
     image: asset('projects/docfit.webp'),
     alt: 'A spreadsheet and a Word template flowing through an AI step into a stack of formatted documents',
     tags: ['AI', 'Document automation', 'In progress'],
-    text: 'Spreadsheet data in, hundreds of perfectly formatted documents out — with AI keeping every template’s layout intact.',
+    text: 'Spreadsheet data in, hundreds of perfectly formatted documents out, with AI keeping every template’s layout intact.',
   },
 ]
 
@@ -162,7 +162,7 @@ export const TEAM = [
     card: 'Designer',
     color: '#7b3fe4',
     photo: asset('team/shruti.webp'),
-    note: 'Understands the human side of every product — researching, shaping flows and crafting interfaces people love to use, like the one you’re exploring right now.',
+    note: 'Understands the human side of every product: researching, shaping flows and crafting interfaces people love to use, like the one you’re exploring right now.',
   },
   {
     name: 'Vinay',
@@ -170,7 +170,7 @@ export const TEAM = [
     card: 'Developer',
     color: '#2a5bd7',
     photo: asset('team/vinay.webp'),
-    note: 'The backbone of everything we ship. Vinay takes on the complex parts — system architecture, clean, scalable code from front end to back end, integrations, performance and security — so every product feels fast, reliable and built to grow.',
+    note: 'The backbone of everything we ship. Vinay takes on the complex parts: system architecture, clean and scalable code from front end to back end, integrations, performance and security. The result is products that feel fast, reliable and built to grow.',
   },
 ]
 
@@ -189,7 +189,7 @@ export const DESIGNER = {
 // "The studio" paragraphs in the About panel.
 export const ABOUT_STUDIO = [
   'We started aakaar to build products the way we always wanted to: design and code in the same room, from the very first conversation.',
-  'You work directly with the two people doing the work — no hand-offs, no layers. We help you figure out what is worth building, then design it, develop it and ship it together.',
+  'You work directly with the two people doing the work. No hand-offs, no layers. We help you figure out what is worth building, then design it, develop it and ship it together.',
 ]
 
 export const PRINCIPLES = ['Small team, direct line', 'Design and code in the same room', 'Ship, learn, refine']
