@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { NAV, SECTIONS, STUDIO } from '../content'
 import { Panel } from './Panel'
-import { startMusic, stopMusic } from '../audio/lofi'
+import { startMusic, stopMusic } from '../audio/ambience'
 
 function Loader({ ready }) {
   const entered = useStore((s) => s.entered)

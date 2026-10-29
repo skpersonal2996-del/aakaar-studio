@@ -532,3 +532,53 @@ export const marble = () =>
     }
     return toTex(c, { soft: true })
   })
+
+// A book spine with its title (and author) printed on it, for the bookshelf.
+// upright: text runs top to bottom like an English spine; otherwise the book lies flat and the
+// title reads left to right. w/h are the spine face's size in metres.
+export const bookSpine = ({ key, title, author, bg, ink, accent = ink, upright, w, h, serif }) =>
+  memo(`spine:${key}:${upright}`, () => {
+    const PX = 2400 // pixels per metre, so small spines stay legible up close
+    const [c, x] = canvas(Math.round(w * PX), Math.round(h * PX))
+    x.fillStyle = bg
+    x.fillRect(0, 0, c.width, c.height)
+    // the long axis of the spine, along which the text runs
+    const long = upright ? c.height : c.width
+    const short = upright ? c.width : c.height
+    if (upright) {
+      x.translate(c.width / 2, 0)
+      x.rotate(Math.PI / 2)
+      x.translate(0, -c.width / 2)
+    }
+    // thin bands near each end, like a printed jacket
+    x.fillStyle = accent
+    x.globalAlpha = 0.85
+    x.fillRect(long * 0.035, short * 0.12, Math.max(2, long * 0.008), short * 0.76)
+    x.fillRect(long * 0.957, short * 0.12, Math.max(2, long * 0.008), short * 0.76)
+    x.globalAlpha = 1
+    const family = serif ? 'Georgia, "Times New Roman", serif' : '"Space Grotesk", sans-serif'
+    x.fillStyle = ink
+    x.textBaseline = 'middle'
+    // author at the far end, small
+    let authorW = 0
+    if (author) {
+      const af = short * 0.26
+      x.font = `500 ${af}px ${family}`
+      authorW = Math.min(x.measureText(author).width, long * 0.32)
+      x.textAlign = 'right'
+      x.globalAlpha = 0.8
+      x.fillText(author, long * 0.93, short / 2, long * 0.32)
+      x.globalAlpha = 1
+    }
+    // title fills what's left, shrinking until it fits
+    const room = long * 0.86 - authorW - (author ? long * 0.05 : 0)
+    let size = short * 0.5
+    x.font = `700 ${size}px ${family}`
+    while (x.measureText(title).width > room && size > short * 0.22) {
+      size -= 1
+      x.font = `700 ${size}px ${family}`
+    }
+    x.textAlign = 'left'
+    x.fillText(title, long * 0.07, short / 2 + size * 0.04, room)
+    return toTex(c)
+  })
