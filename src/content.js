@@ -1,5 +1,8 @@
 // All site copy lives here. Names, clients and links are placeholders to swap for the real ones.
 
+// Files in public/, resolved against the deploy base (the site lives under /aakaar-studio/ on GitHub Pages).
+const asset = (path) => import.meta.env.BASE_URL + path
+
 export const STUDIO = {
   name: 'aakaar',
   tagline: 'Design • Develop • Together',
@@ -101,7 +104,7 @@ export const PROJECTS = [
   {
     name: 'Bridge',
     title: 'Making everyday operations easier.',
-    image: '/projects/bridge.webp',
+    image: asset('projects/bridge.webp'),
     alt: 'A driving school office with learner cars, cones, a checklist and a car key',
     text: 'Digitizing manual processes is one thing. Making them intuitive, accurate, and genuinely less time-consuming for non-technical users is another. We designed the end-to-end product experience, simplifying administrative workflows and introducing automation to reduce repetitive work.',
     impact: 'Reduced admin time by 60%, streamlined daily operations, and made business data easier to track for better decision-making.',
@@ -109,14 +112,14 @@ export const PROJECTS = [
   {
     name: 'PrimeChat',
     title: 'Turning donations into moments worth celebrating.',
-    image: '/projects/primechat.webp',
+    image: asset('projects/primechat.webp'),
     alt: 'PrimeChat overlay in OBS showing a donation alert, a goal bar and recent supporters over a game',
     text: 'Donations are more than transactions for live streamers; they’re moments of connection with their community. PrimeChat lets creators customize donation pages and alerts, bringing supporter interactions directly into their streams through OBS. The experience makes it easier to acknowledge supporters and keep them part of the show.',
   },
   {
     name: 'DocFit',
     title: 'Documents that format themselves.',
-    image: '/projects/docfit.webp',
+    image: asset('projects/docfit.webp'),
     alt: 'A spreadsheet and a Word template flowing through an AI step into a stack of formatted documents',
     text: 'Turning spreadsheet data into hundreds of consistently formatted documents shouldn’t mean hours of manual work. DocFit explores how AI can bring data and fixed document templates together, with field mapping, live previews, and conversational corrections to help preserve layouts and simplify document generation.',
   },
@@ -152,7 +155,7 @@ export const TEAM = [
     role: 'Product designer · Co-founder',
     card: 'Designer',
     color: '#7b3fe4',
-    photo: '/team/shruti.webp',
+    photo: asset('team/shruti.webp'),
     note: 'Understands the human side of every product — researching, shaping flows and crafting interfaces people love to use.',
   },
   {
@@ -160,7 +163,7 @@ export const TEAM = [
     role: 'Developer · Co-founder',
     card: 'Developer',
     color: '#2a5bd7',
-    photo: '/team/vinay.webp',
+    photo: asset('team/vinay.webp'),
     note: 'The backbone of everything we ship — architecture, front to back, and the 3D you’re looking at right now.',
   },
 ]
