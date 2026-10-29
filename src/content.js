@@ -1,6 +1,6 @@
 // All site copy lives here. Names, clients and links are placeholders to swap for the real ones.
 
-// Files in public/, resolved against the deploy base (the site lives under /aakaar-studio/ on GitHub Pages).
+// Files in public/, resolved against the deploy base (/ on Vercel, /aakaar-studio/ on GitHub Pages).
 const asset = (path) => import.meta.env.BASE_URL + path
 
 export const STUDIO = {

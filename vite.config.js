@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Production builds are served from github.io/aakaar-studio/; dev stays at /.
-export default defineConfig(({ command }) => ({
+// GitHub Pages serves the site from /aakaar-studio/ (the deploy workflow sets GITHUB_PAGES);
+// everywhere else (dev, Vercel) it lives at the domain root.
+export default defineConfig({
   plugins: [react()],
-  base: command === 'build' ? '/aakaar-studio/' : '/',
-}))
+  base: process.env.GITHUB_PAGES ? '/aakaar-studio/' : '/',
+})
