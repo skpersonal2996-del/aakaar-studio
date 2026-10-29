@@ -1,29 +1,30 @@
-// Quiet old-library ambience, synthesised live with Web Audio (no audio files, no licensing).
-// A slow felt-piano waltz with soft string swells in a big, warm room, rain on the windows
-// underneath, and a faint record crackle for that old-reading-room feel.
+// Subtle library-café background music, synthesised live with Web Audio (no audio files, no licensing).
+// Mellow electric-piano jazz chords, a soft upright bass, barely-there brushes and the odd
+// vibraphone note, in a small warm room, with a light patter of rain and faint record crackle.
 
-const BPM = 58
+const BPM = 66
 const BEAT = 60 / BPM
-const BAR = BEAT * 3 // a slow waltz
+const BAR = BEAT * 4
 
-// An unhurried eight-bar loop in D major: bass note, then the chord on beats two and three.
+// Eight bars of gentle jazz harmony in D: rich, unresolved chords that never push anywhere.
 const BARS = [
-  { bass: 38, chord: [57, 61, 66] }, // Dmaj7
-  { bass: 43, chord: [59, 62, 66] }, // Gmaj7
-  { bass: 47, chord: [57, 62, 66] }, // Bm7
-  { bass: 43, chord: [59, 62, 66] }, // Gmaj7
+  { bass: 38, chord: [54, 57, 61, 64] }, // Dmaj9
+  { bass: 47, chord: [57, 61, 62, 66] }, // Bm9
   { bass: 40, chord: [55, 59, 62, 66] }, // Em9
-  { bass: 45, chord: [55, 59, 62, 64] }, // A7sus4
-  { bass: 38, chord: [57, 61, 66] }, // Dmaj7
-  { bass: 43, chord: [59, 61, 66] }, // Gmaj7(#11)
+  { bass: 45, chord: [55, 59, 61, 66] }, // A13
+  { bass: 43, chord: [54, 57, 59, 62] }, // Gmaj9
+  { bass: 42, chord: [52, 57, 61, 64] }, // F#m7
+  { bass: 40, chord: [55, 59, 62, 66] }, // Em9
+  { bass: 45, chord: [55, 59, 61, 66] }, // A13
 ]
+const MELODY = [69, 71, 73, 74, 76, 78, 81] // D major, upper middle register
 
 const hz = (m) => 440 * Math.pow(2, (m - 69) / 12)
 const rand = (a, b) => a + Math.random() * (b - a)
 
 let ctx = null
 let master = null
-let bus = null // music: dry + hall
+let bus = null
 let rainBus = null
 let timer = null
 let nextBar = 0
@@ -47,20 +48,11 @@ function noiseBuffer(seconds, brown = false) {
   for (let i = 0; i < d.length; i++) {
     const w = Math.random() * 2 - 1
     if (brown) {
-      last = (last + 0.02 * w) / 1.02 // integrated noise: a deep, soft hush
+      last = (last + 0.02 * w) / 1.02 // integrated noise: a soft, low hush
       d[i] = last * 3.5
     } else d[i] = w
   }
   return buf
-}
-
-function loop(buffer, ...chain) {
-  const s = ctx.createBufferSource()
-  s.buffer = buffer
-  s.loop = true
-  chain.reduce((a, b) => a.connect(b), s)
-  s.start(0, Math.random() * buffer.duration)
-  return s
 }
 
 function filter(type, frequency, Q = 0.7) {
@@ -77,129 +69,149 @@ function gain(value) {
   return g
 }
 
+function loop(buffer, ...chain) {
+  const s = ctx.createBufferSource()
+  s.buffer = buffer
+  s.loop = true
+  chain.reduce((a, b) => a.connect(b), s)
+  s.start(0, Math.random() * buffer.duration)
+}
+
 function setup() {
   ctx = new (window.AudioContext || window.webkitAudioContext)()
   master = gain(0)
   master.connect(ctx.destination)
 
-  // warm, slightly dark tone for the music, then a long hall like a high-ceilinged reading room
-  const tone = filter('lowpass', 3200, 0.4)
+  // warm, rounded tone and a small cosy room
+  const tone = filter('lowpass', 2600, 0.4)
   tone.connect(master)
-  const hall = ctx.createConvolver()
-  hall.buffer = impulse(4.2, 3)
-  hall.connect(gain(0.42)).connect(tone)
+  const room = ctx.createConvolver()
+  room.buffer = impulse(2.4, 3)
+  room.connect(gain(0.3)).connect(tone)
   bus = gain(1)
   bus.connect(tone)
-  bus.connect(hall)
+  bus.connect(room)
 
-  // rain: a soft low hush plus a fine high patter, slowly breathing in and out
+  // light rain on the window, kept well under the music
   rainBus = gain(1)
   rainBus.connect(master)
-  const breathe = ctx.createOscillator()
-  breathe.frequency.value = 0.04
-  const breatheAmt = gain(0.25)
-  breathe.connect(breatheAmt).connect(rainBus.gain)
-  breathe.start()
-  loop(noiseBuffer(7, true), filter('lowpass', 900), filter('highpass', 120), gain(0.09), rainBus)
-  loop(noiseBuffer(5), filter('highpass', 2800), filter('lowpass', 8000), gain(0.008), rainBus)
+  loop(noiseBuffer(7, true), filter('lowpass', 800), filter('highpass', 140), gain(0.045), rainBus)
+  loop(noiseBuffer(5), filter('highpass', 3000), filter('lowpass', 7500), gain(0.004), rainBus)
 
   // faint record crackle
   const crackle = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate)
   const cd = crackle.getChannelData(0)
   for (let i = 0; i < cd.length; i++) if (Math.random() < 0.00025) cd[i] = (Math.random() * 2 - 1) * 0.5
-  loop(crackle, gain(0.025), master)
+  loop(crackle, gain(0.02), master)
 }
 
-// Felt piano: a few soft harmonics, a gentle hammer, a long natural decay.
-function piano(midi, t, vel, dur = 4.5) {
+// Electric piano: a sine body with a soft bell on the attack, mellowed right down.
+function keys(midi, t, dur, vel) {
   const f = hz(midi)
   const out = ctx.createGain()
   out.gain.setValueAtTime(0, t)
-  out.gain.linearRampToValueAtTime(vel, t + 0.012)
-  out.gain.exponentialRampToValueAtTime(vel * 0.4, t + 0.5)
+  out.gain.linearRampToValueAtTime(vel, t + 0.025)
+  out.gain.exponentialRampToValueAtTime(vel * 0.4, t + 0.7)
   out.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  const felt = filter('lowpass', Math.min(5000, f * 6), 0.3)
   const pan = ctx.createStereoPanner()
-  pan.pan.value = Math.max(-0.6, Math.min(0.6, (midi - 60) / 30)) // low notes left, high right
-  out.connect(felt).connect(pan).connect(bus)
-  ;[
-    [1, 1],
-    [2, 0.35],
-    [3, 0.12],
-    [4, 0.05],
-  ].forEach(([h, amp]) => {
-    const o = ctx.createOscillator()
-    o.frequency.value = f * h
-    o.detune.value = rand(-3, 3)
-    const g = gain(amp)
-    o.connect(g).connect(out)
-    o.start(t)
-    o.stop(t + dur + 0.05)
-  })
+  pan.pan.value = rand(-0.25, 0.25)
+  out.connect(pan).connect(bus)
+  const car = ctx.createOscillator()
+  car.frequency.value = f
+  car.detune.value = rand(-4, 4)
+  const mod = ctx.createOscillator()
+  mod.frequency.value = f * 2
+  const modGain = ctx.createGain()
+  modGain.gain.setValueAtTime(f * 0.5, t)
+  modGain.gain.exponentialRampToValueAtTime(f * 0.02, t + 0.35)
+  mod.connect(modGain).connect(car.frequency)
+  car.connect(out)
+  car.start(t)
+  mod.start(t)
+  car.stop(t + dur + 0.05)
+  mod.stop(t + dur + 0.05)
 }
 
-// Soft string section: detuned saws, heavily filtered, swelling in and out.
-function strings(notes, t, dur) {
-  const out = ctx.createGain()
-  out.gain.setValueAtTime(0, t)
-  out.gain.linearRampToValueAtTime(1, t + dur * 0.4)
-  out.gain.linearRampToValueAtTime(0, t + dur)
-  const lp = filter('lowpass', 900, 0.5)
-  out.connect(lp).connect(bus)
-  notes.forEach((m) => {
-    ;[-7, 7].forEach((cents) => {
-      const o = ctx.createOscillator()
-      o.type = 'sawtooth'
-      o.frequency.value = hz(m)
-      o.detune.value = cents
-      const g = gain(0.006)
-      o.connect(g).connect(out)
-      o.start(t)
-      o.stop(t + dur + 0.1)
-    })
-  })
-}
-
-// A single raindrop on the glass: a tiny, high tick.
-function drop(t) {
-  const s = ctx.createBufferSource()
-  s.buffer = drop.buf ||= noiseBuffer(0.2)
-  const bp = filter('bandpass', rand(2200, 5200), 6)
+// Soft upright bass: a rounded pluck that blooms and fades.
+function bass(midi, t, dur) {
+  const o = ctx.createOscillator()
+  o.type = 'triangle'
+  o.frequency.value = hz(midi)
   const g = ctx.createGain()
-  g.gain.setValueAtTime(rand(0.01, 0.035), t)
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03)
-  const pan = ctx.createStereoPanner()
-  pan.pan.value = rand(-0.8, 0.8)
-  s.connect(bp).connect(g).connect(pan).connect(rainBus)
-  s.start(t, Math.random() * 0.15)
-  s.stop(t + 0.05)
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(0.13, t + 0.03)
+  g.gain.exponentialRampToValueAtTime(0.05, t + 0.35)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  o.connect(filter('lowpass', 320, 0.5)).connect(g).connect(bus)
+  o.start(t)
+  o.stop(t + dur + 0.05)
+}
+
+// Vibraphone: pure tone with a slow shimmer.
+function vibes(midi, t, vel) {
+  const o = ctx.createOscillator()
+  o.frequency.value = hz(midi)
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vel, t + 0.01)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6)
+  // shimmer in its own stage, so it fades out with the note
+  const shimmer = gain(1)
+  const trem = ctx.createOscillator()
+  trem.frequency.value = 4.5
+  trem.connect(gain(0.3)).connect(shimmer.gain)
+  o.connect(shimmer).connect(g).connect(bus)
+  ;[o, trem].forEach((n) => {
+    n.start(t)
+    n.stop(t + 2.7)
+  })
+}
+
+// A brush swept across the snare: a long, quiet hiss.
+function brush(t, vel, len = 0.35) {
+  const s = ctx.createBufferSource()
+  s.buffer = brush.buf ||= noiseBuffer(1)
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vel, t + len * 0.4)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len)
+  s.connect(filter('bandpass', 2400, 0.6)).connect(g).connect(bus)
+  s.start(t, Math.random() * 0.5)
+  s.stop(t + len + 0.05)
 }
 
 function scheduleBar(t, n) {
-  const { bass, chord } = BARS[n % BARS.length]
-  const sway = () => rand(-0.02, 0.03) // a little rubato, like a person playing
+  const { bass: root, chord } = BARS[n % BARS.length]
+  const swing = BEAT * 0.16
+  const ease = () => rand(-0.012, 0.02)
 
-  // the piano rests for the first two bars and lets the rain set the scene
-  if (n >= 2) {
-    piano(bass, t + sway(), 0.14, BAR * 1.6)
-    piano(bass + 12, t + 0.03 + sway(), 0.05, BAR * 1.2)
-    chord.forEach((m) => piano(m, t + BEAT + sway(), 0.05))
-    chord.forEach((m) => piano(m, t + BEAT * 2 + sway(), 0.035))
+  // chord, gently rolled, with a lighter comp later in the bar
+  chord.forEach((m, k) => keys(m, t + k * 0.03 + ease(), BAR * 0.95, 0.04))
+  if (Math.random() < 0.6) chord.slice(1).forEach((m, k) => keys(m, t + BEAT * 2.5 + swing + k * 0.025, BEAT * 1.3, 0.016))
+
+  // bass on one and three, walking up into the next bar now and then
+  if (n >= 1) {
+    bass(root, t, BEAT * 1.8)
+    bass(root + 7, t + BEAT * 2, BEAT * 1.4)
+    if (Math.random() < 0.4) bass(root + 9, t + BEAT * 3.5 + swing, BEAT * 0.5)
   }
-  // a quiet melody line, drifting over the chords
-  if (n >= 4 && Math.random() < 0.75) {
-    const tones = chord.map((m) => m + 12).concat(chord.map((m) => m + 24)).filter((m) => m <= 88)
-    const count = Math.random() < 0.5 ? 1 : 2
-    for (let k = 0; k < count; k++) {
-      piano(tones[Math.floor(Math.random() * tones.length)], t + (k === 0 ? 0 : BEAT * (1 + Math.floor(Math.random() * 2))) + sway(), 0.07, BAR * 1.4)
+
+  // barely-there brushes on two and four
+  if (n >= 2) {
+    brush(t + BEAT, 0.018)
+    brush(t + BEAT * 3, 0.018)
+    if (Math.random() < 0.5) brush(t + BEAT * 3.5 + swing, 0.008, 0.18)
+  }
+
+  // an occasional vibraphone phrase floating over the top
+  if (n >= 4 && Math.random() < 0.55) {
+    let at = Math.floor(rand(0, 4)) * (BEAT / 2)
+    const count = 1 + Math.floor(Math.random() * 3)
+    for (let k = 0; k < count && at < BAR; k++) {
+      vibes(MELODY[Math.floor(Math.random() * MELODY.length)], t + at + ease(), 0.035)
+      at += BEAT * (1 + Math.floor(Math.random() * 2))
     }
   }
-  // strings swell every other bar
-  if (n >= 4 && n % 2 === 0) strings(chord, t, BAR * 2)
-
-  // scattered drops on the window
-  const drops = 4 + Math.floor(Math.random() * 6)
-  for (let k = 0; k < drops; k++) drop(t + Math.random() * BAR)
 }
 
 function tick() {
@@ -219,7 +231,7 @@ export function startMusic() {
   }
   playing = true
   master.gain.cancelScheduledValues(ctx.currentTime)
-  master.gain.setTargetAtTime(1, ctx.currentTime, 1.6) // slow fade in; still peaks around a quarter of full scale
+  master.gain.setTargetAtTime(0.8, ctx.currentTime, 1.6) // slow fade in
 }
 
 export function stopMusic() {
