@@ -60,6 +60,7 @@ function setInput(c, on) {
 export function CameraRig() {
   const ref = useRef()
   const size = useThree((s) => s.size)
+  const setEvents = useThree((s) => s.setEvents)
   const active = useStore((s) => s.active)
   const entered = useStore((s) => s.entered)
   const resetTick = useStore((s) => s.resetTick)
@@ -83,11 +84,33 @@ export function CameraRig() {
     c.azimuthRotateSpeed = 0.35
     c.polarRotateSpeed = 0.3
     c.dollySpeed = 0.4
-    c.draggingSmoothTime = 0.18
+    c.draggingSmoothTime = 0.28 // a little glide behind the pointer, so looking around feels fluid
     setInput(c, false)
     c.setLookAt(...INTRO.pos, ...INTRO.target, false)
     if (import.meta.env.DEV) window.__controls = c
-  }, [])
+
+    // While dragging, skip hover hit-testing: it checks every book and prop on each pointer move
+    // and nothing can be hovered mid-drag anyway. It starts once the pointer actually moves, so a
+    // plain click still reaches the object under it.
+    let dragging = false
+    const onMove = () => {
+      // wheel zooms also fire 'control' but never 'controlend', so only count real drags
+      if (dragging || c.currentAction === ACTION.NONE) return
+      dragging = true
+      setEvents({ enabled: false })
+    }
+    const onEnd = () => {
+      if (!dragging) return
+      dragging = false
+      setEvents({ enabled: true })
+    }
+    c.addEventListener('control', onMove)
+    c.addEventListener('controlend', onEnd)
+    return () => {
+      c.removeEventListener('control', onMove)
+      c.removeEventListener('controlend', onEnd)
+    }
+  }, [setEvents])
 
   useEffect(() => {
     const c = ref.current
