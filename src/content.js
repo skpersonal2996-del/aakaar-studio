@@ -170,7 +170,7 @@ export const TEAM = [
     card: 'Developer',
     color: '#2a5bd7',
     photo: asset('team/vinay.webp'),
-    note: 'The backbone of everything we ship — architecture, front to back, and the 3D you’re looking at right now.',
+    note: 'The backbone of everything we ship. Vinay takes on the complex parts — system architecture, clean, scalable code from front end to back end, integrations, performance and security — so every product feels fast, reliable and built to grow.',
   },
 ]
 
