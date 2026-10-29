@@ -31,7 +31,7 @@ export default function App() {
             shadows
             flat
             frameloop="demand"
-            dpr={[1, 2]}
+            dpr={[1, 1.5]} // past 1.5× sharp screens look the same here but cost far more to draw
             gl={{ antialias: false, powerPreference: 'high-performance' }}
             camera={{ fov: 42, near: 0.05, far: 60, position: [10, 7.5, 13.5] }}
             onPointerMissed={(e) => {

@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { rng } from './textures'
+import { rng, shrink } from './textures'
 import { Box } from './parts'
 import { ROOM } from './views'
 
@@ -107,9 +107,10 @@ function cityTexture(mode) {
     }
   })
 
-  const t = new THREE.CanvasTexture(c)
+  // it's far-off scenery behind glass, so half resolution is plenty
+  const t = new THREE.CanvasTexture(shrink(c, 0.5))
   t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
+  t.anisotropy = 2
   return t
 }
 

@@ -20,14 +20,25 @@ function canvas(w, h) {
   return [c, c.getContext('2d')]
 }
 
-function toTex(c, { repeat, srgb = true } = {}) {
-  const t = new THREE.CanvasTexture(c)
+// Paint at full size, then scale the finished canvas down (the painting code stays in one size).
+export function shrink(c, f) {
+  const [s, x] = canvas(Math.round(c.width * f), Math.round(c.height * f))
+  x.imageSmoothingQuality = 'high'
+  x.drawImage(c, 0, 0, s.width, s.height)
+  return s
+}
+
+// soft: for surfaces nobody looks at closely (floor, walls, fabrics, wall art). Half the
+// resolution and less anisotropic filtering, so they cost less to sample and read slightly
+// softer, keeping the eye on the sign, the people, the laptops and the ID wall.
+function toTex(c, { repeat, srgb = true, soft = false } = {}) {
+  const t = new THREE.CanvasTexture(soft ? shrink(c, 0.5) : c)
   if (repeat) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping
     t.repeat.set(repeat[0], repeat[1])
   }
   if (srgb) t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 8
+  t.anisotropy = soft ? 2 : 8
   return t
 }
 
@@ -82,7 +93,7 @@ export const woodFloor = () =>
       x.fillStyle = 'rgba(8,4,2,.8)'
       x.fillRect(0, i * rh, 1024, 2)
     }
-    return toTex(c, { repeat: [4, 14 / 3] })
+    return toTex(c, { soft: true, repeat: [4, 14 / 3] })
   })
 
 export const plaster = () =>
@@ -95,7 +106,7 @@ export const plaster = () =>
       x.fillStyle = r() < 0.5 ? `rgba(0,0,0,${r() * 0.07})` : `rgba(255,255,255,${r() * 0.05})`
       x.fillRect(r() * 512, r() * 512, 1 + r() * 2, 1 + r() * 2)
     }
-    return toTex(c, { repeat: [4, 2] })
+    return toTex(c, { soft: true, repeat: [4, 2] })
   })
 
 export const woodGrain = (key = 'walnut', hue = 24, light = 30) =>
@@ -105,7 +116,7 @@ export const woodGrain = (key = 'walnut', hue = 24, light = 30) =>
     x.fillStyle = `hsl(${hue},42%,${light}%)`
     x.fillRect(0, 0, 256, 1024)
     grain(x, r, 0, 0, 256, 1024, 70, true)
-    return toTex(c)
+    return toTex(c, { soft: true })
   })
 
 export const fabric = (key, base, repeat = [3, 3]) =>
@@ -124,7 +135,7 @@ export const fabric = (key, base, repeat = [3, 3]) =>
       x.fillStyle = r() < 0.5 ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)'
       x.fillRect(r() * 256, r() * 256, 1, 1)
     }
-    return toTex(c, { repeat })
+    return toTex(c, { soft: true, repeat })
   })
 
 export const rug = () =>
@@ -145,7 +156,7 @@ export const rug = () =>
       x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l)
       x.stroke()
     }
-    return toTex(c, { repeat: [3, 2.5] })
+    return toTex(c, { soft: true, repeat: [3, 2.5] })
   })
 
 export const check = () =>
@@ -158,7 +169,7 @@ export const check = () =>
       x.fillRect(i, 0, 7, 128)
       x.fillRect(0, i, 128, 7)
     }
-    return toTex(c, { repeat: [2, 2] })
+    return toTex(c, { soft: true, repeat: [2, 2] })
   })
 
 export const pegboard = () =>
@@ -388,7 +399,7 @@ export const artPrint = (seed) =>
       else x.rect(30 + r() * 160, 30 + r() * 260, 40 + r() * 100, 40 + r() * 120)
       x.fill()
     }
-    return toTex(c)
+    return toTex(c, { soft: true })
   })
 
 export const bwArt = () =>
@@ -409,7 +420,7 @@ export const bwArt = () =>
     x.beginPath()
     x.arc(120, 150, 52, 0, Math.PI * 2)
     x.fill()
-    return toTex(c)
+    return toTex(c, { soft: true })
   })
 
 export const poster = () =>
@@ -422,7 +433,7 @@ export const poster = () =>
     ;['Good', 'Design', 'Builds', 'Better', 'Futures'].forEach((w, i) => x.fillText(w, 34, 92 + i * 64))
     x.fillStyle = '#c4592b'
     x.fillRect(34, 420, 46, 8)
-    return toTex(c)
+    return toTex(c, { soft: true })
   })
 
 export const jute = (key = 'jute', base = '#8a7356') =>
@@ -441,7 +452,7 @@ export const jute = (key = 'jute', base = '#8a7356') =>
     x.strokeStyle = 'rgba(30,20,10,.35)'
     x.lineWidth = 10
     x.strokeRect(14, 14, 484, 484)
-    const t = toTex(c)
+    const t = toTex(c, { soft: true })
     return t
   })
 
@@ -519,5 +530,5 @@ export const marble = () =>
       }
       x.stroke()
     }
-    return toTex(c)
+    return toTex(c, { soft: true })
   })
