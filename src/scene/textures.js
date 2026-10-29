@@ -238,7 +238,7 @@ export const photoCard = ({ name, card, color, photo }) =>
       x.fillText(card.toUpperCase(), 160, 418)
       x.fillStyle = '#555'
       x.font = '500 15px "JetBrains Mono", monospace'
-      x.fillText('CO-FOUNDER', 160, 446)
+      x.fillText('COFOUNDER', 160, 446)
       tex.needsUpdate = true
     }
     paint(null)

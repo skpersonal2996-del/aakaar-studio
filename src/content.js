@@ -18,7 +18,7 @@ export const SECTIONS = {
     label: 'Projects',
     object: 'Shruti’s laptop',
     title: 'Selected work',
-    intro: 'Products we have shaped from first sketch to shipped code. Small team, end-to-end ownership.',
+    intro: 'Products we have shaped from first sketch to shipped code. Small team, full ownership from start to finish.',
   },
   story: {
     index: '02',
@@ -47,7 +47,7 @@ export const SECTIONS = {
     object: 'The ID wall',
     title: 'Meet the founders',
     intro:
-      'Aakaar (आकार) means “shape”. We are a two-person digital product studio: a designer and a developer who take ideas from a rough sketch to a product people use, and share one very large desk while doing it.',
+      'Aakaar (आकार) means “shape”. We are a digital product studio of two: a designer and a developer who take ideas from a rough sketch to a product people use, and share one very large desk while doing it.',
   },
   contact: {
     index: '06',
@@ -81,7 +81,7 @@ export const PROCESS = [
     icon: 'build',
     title: 'We design and build.',
     text: 'We bring design and development together, using AI tools where they help us explore ideas, test possibilities, and work more efficiently. AI helps us work smarter. Human judgment still leads the way.',
-    tags: ['Design + code together', 'AI-assisted, human-led'],
+    tags: ['Design + code together', 'Assisted by AI, led by people'],
   },
   {
     short: 'Launch',
@@ -118,7 +118,7 @@ export const PROJECTS = [
     image: asset('projects/primechat.webp'),
     alt: 'PrimeChat overlay in OBS showing a donation alert, a goal bar and recent supporters over a game',
     tags: ['Live streaming', 'Creator tools', 'OBS overlays'],
-    text: 'Custom donation pages and on-stream alerts that help creators thank supporters live and keep them part of the show.',
+    text: 'Custom donation pages and live stream alerts that help creators thank supporters live and keep them part of the show.',
     url: 'https://dev.primechat.live/',
   },
   {
@@ -140,7 +140,7 @@ export const STORY = [
   { emoji: '💸', text: 'Books weren’t exactly in a student’s budget…' },
   { emoji: '🤝', text: '…so we came up with a plan: you’d buy two, I’d buy two, and together, we’d have four.', hand: true },
   { emoji: '📚', text: 'And just like that, our little collection began.' },
-  { emoji: '🔍', text: 'We started with self-help books, looking for answers, ideas, and maybe a shortcut to figuring life out.' },
+  { emoji: '🔍', text: 'We started with self help books, looking for answers, ideas, and maybe a shortcut to figuring life out.' },
   { emoji: '😅', text: 'We didn’t find all the answers, of course.', hand: true },
   { emoji: '💡', text: 'But we found something better: a habit of staying curious, sharing what we learned, and growing together.' },
   { emoji: '😄', text: 'Looking back, it’s funny how a small decision to split the cost of four books…' },
@@ -158,7 +158,7 @@ export const SERVICES = [
 export const TEAM = [
   {
     name: 'Shruti',
-    role: 'Product designer · Co-founder',
+    role: 'Product designer · Cofounder',
     card: 'Designer',
     color: '#7b3fe4',
     photo: asset('team/shruti.webp'),
@@ -166,7 +166,7 @@ export const TEAM = [
   },
   {
     name: 'Vinay',
-    role: 'Developer · Co-founder',
+    role: 'Developer · Cofounder',
     card: 'Developer',
     color: '#2a5bd7',
     photo: asset('team/vinay.webp'),
@@ -189,7 +189,7 @@ export const DESIGNER = {
 // "The studio" paragraphs in the About panel.
 export const ABOUT_STUDIO = [
   'We started aakaar to build products the way we always wanted to: design and code in the same room, from the very first conversation.',
-  'You work directly with the two people doing the work. No hand-offs, no layers. We help you figure out what is worth building, then design it, develop it and ship it together.',
+  'You work directly with the two people doing the work. No handoffs, no layers. We help you figure out what is worth building, then design it, develop it and ship it together.',
 ]
 
 export const PRINCIPLES = ['Small team, direct line', 'Design and code in the same room', 'Ship, learn, refine']
