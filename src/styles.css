@@ -304,7 +304,7 @@ a { color: inherit; }
 .beat.is-in .beat__text { opacity: 1; transform: none; }
 .beat.is-in .beat__emoji { opacity: 1; transform: scale(1); }
 
-.tale__end { display: grid; place-items: center; padding-top: 6px; opacity: 0; transform: translateY(8px); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
+.tale__end { display: grid; place-items: center; padding-top: 10px; opacity: 0; transform: translateY(8px); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
 .tale__end.is-in { opacity: 1; transform: none; }
 .tale__sign {
   font-family: var(--round); font-size: 30px; color: #fff3e2; padding: 6px 18px; border-radius: 999px;
