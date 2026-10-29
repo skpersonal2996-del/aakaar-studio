@@ -235,15 +235,24 @@ a { color: inherit; }
 .project--live:hover .project__thumb { border-color: rgba(255, 154, 61, 0.55); }
 .project--soon { cursor: default; }
 .project--soon:hover .project__thumb img { filter: blur(3px) brightness(0.45); }
-/* pill over the thumbnail: "Visit site ↗" on live work, "Coming soon" otherwise */
+.project--live .project__thumb { cursor: none; }
+/* round "Visit" cursor that follows the mouse over live project images (moved from Panel.jsx) */
+.visit-cursor { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; }
+.visit-cursor span {
+  display: grid; place-items: center; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%;
+  font-size: 12px !important; letter-spacing: 0.12em; text-transform: uppercase; color: #1a120d;
+  background: linear-gradient(135deg, #ffb14d, #ff8fc0); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0; transform: scale(0.3); transition: opacity 0.25s var(--ease), transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.visit-cursor.is-on span { opacity: 1; transform: scale(1); }
+/* "Coming soon" pill over unreleased work */
 .project__cta {
   position: absolute; left: 50%; top: 50%; padding: 9px 16px; border-radius: 999px; white-space: nowrap;
-  font-size: 11px !important; letter-spacing: 0.14em; text-transform: uppercase; color: #1a120d;
-  background: linear-gradient(90deg, #ffb14d, #ff8fc0); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-size: 11px !important; letter-spacing: 0.14em; text-transform: uppercase;
+  background: rgba(20, 15, 13, 0.85); color: #ffe2c6; border: 1px solid rgba(255, 154, 61, 0.5);
   opacity: 0; transform: translate(-50%, -40%); transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
 }
-.project--soon .project__cta { background: rgba(20, 15, 13, 0.85); color: #ffe2c6; border: 1px solid rgba(255, 154, 61, 0.5); }
-.project:hover .project__cta, .project:focus-visible .project__cta { opacity: 1; transform: translate(-50%, -50%); }
+.project:hover .project__cta { opacity: 1; transform: translate(-50%, -50%); }
 .project__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .project__tags span {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 9px;

@@ -1,15 +1,72 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import { SERVICE_ART } from './ServiceArt'
 import { PROCESS_ICONS } from './ProcessIcons'
 import { Story } from './Story'
 import { ABOUT_STUDIO, PRINCIPLES, PROCESS, PROJECTS, SECTIONS, SERVICES, SOCIALS, STUDIO, TEAM } from '../content'
 
+// A round "Visit" cursor that trails the mouse over live project images.
+function useVisitCursor() {
+  const dot = useRef()
+  useEffect(() => {
+    const el = dot.current
+    let x = 0
+    let y = 0
+    let cx = 0
+    let cy = 0
+    let raf = 0
+    const step = () => {
+      cx += (x - cx) * 0.25
+      cy += (y - cy) * 0.25
+      el.style.transform = `translate(${cx}px, ${cy}px)`
+      raf = Math.abs(x - cx) + Math.abs(y - cy) > 0.3 ? requestAnimationFrame(step) : 0
+    }
+    const move = (e) => {
+      const over = e.target.closest?.('.project--live .project__thumb')
+      el.classList.toggle('is-on', !!over)
+      if (!over) return
+      if (!el.dataset.placed) {
+        cx = e.clientX // appear right under the pointer rather than sliding in from the corner
+        cy = e.clientY
+        el.dataset.placed = '1'
+      }
+      x = e.clientX
+      y = e.clientY
+      if (!raf) raf = requestAnimationFrame(step)
+    }
+    const leave = () => el.classList.remove('is-on')
+    // scrolling moves the images under a still pointer, so check what's under it again
+    const recheck = () => {
+      const under = document.elementFromPoint(x, y)
+      el.classList.toggle('is-on', !!under?.closest('.project--live .project__thumb'))
+    }
+    window.addEventListener('pointermove', move, { passive: true })
+    window.addEventListener('scroll', recheck, { capture: true, passive: true })
+    document.addEventListener('pointerleave', leave)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('scroll', recheck, { capture: true })
+      document.removeEventListener('pointerleave', leave)
+      cancelAnimationFrame(raf)
+    }
+  }, [])
+  return dot
+}
+
 function Projects() {
+  const cursor = useVisitCursor()
   return (
     <div className="list">
+      {/* on the body, since the sliding panel's transform would offset a fixed element */}
+      {createPortal(
+        <span className="visit-cursor mono" ref={cursor} aria-hidden>
+          <span>Visit</span>
+        </span>,
+        document.body,
+      )}
       {PROJECTS.map((p, i) => {
-        // live projects open their own site; ones without a url show "Coming soon" on hover
+        // live projects open their own site (with the Visit cursor); ones without a url show "Coming soon"
         const Card = p.url ? 'a' : 'article'
         const link = p.url ? { href: p.url, target: '_blank', rel: 'noreferrer' } : { 'aria-disabled': true }
         return (
@@ -20,7 +77,7 @@ function Projects() {
             <h3 className="project__title">{p.title}</h3>
             <div className="project__thumb">
               <img src={p.image} alt={p.alt} loading="lazy" />
-              <span className="project__cta mono">{p.url ? 'Visit site ↗' : 'Coming soon'}</span>
+              {!p.url && <span className="project__cta mono">Coming soon</span>}
             </div>
             <div className="project__tags">
               {p.tags.map((t) => (
