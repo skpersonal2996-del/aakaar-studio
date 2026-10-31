@@ -219,6 +219,9 @@ const SOCIAL_ICONS = {
 
 function Contact() {
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
+  const timer = useRef()
+  useEffect(() => () => clearTimeout(timer.current), [])
   return (
     <>
       <a className="bigmail" href={`mailto:${STUDIO.email}`}>
@@ -230,74 +233,75 @@ function Contact() {
         </a>
         <button
           className="btn"
-          onClick={() => {
-            navigator.clipboard?.writeText(STUDIO.email)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 1600)
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(STUDIO.email)
+              setCopied(true)
+              setCopyError(false)
+              clearTimeout(timer.current)
+              timer.current = setTimeout(() => setCopied(false), 1600)
+            } catch { setCopyError(true) }
           }}>
           {copied ? 'Copied ✓' : 'Copy email'}
         </button>
       </div>
+      {copyError && <p role="status">Select the email address above to copy it, or open your email app.</p>}
+      {SOCIALS.some(([, href]) => href && href !== '#') && <>
       <h4 className="mono label">Elsewhere</h4>
       <div className="socials">
-        {SOCIALS.map(([n, href]) => (
+        {SOCIALS.filter(([, href]) => href && href !== '#').map(([n, href]) => (
           <a key={n} href={href} target="_blank" rel="noreferrer" aria-label={n} title={n}>
             {SOCIAL_ICONS[n]}
           </a>
         ))}
       </div>
+      </>}
     </>
   )
 }
 
 const BODIES = { projects: Projects, story: Story, services: Services, process: Process, about: About, contact: Contact }
 
-// Wheel scrolling glides instead of stepping: each wheel tick moves a target, and the panel
-// eases toward it. Keyboard, scrollbar and touch scrolling are left as they are.
-function useSmoothWheel(ref, key) {
-  useEffect(() => {
-    const el = ref.current
-    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let target = el.scrollTop
-    let cur = el.scrollTop
-    let raf = 0
-    const step = () => {
-      cur += (target - cur) * 0.1
-      if (Math.abs(target - cur) < 0.5) cur = target
-      el.scrollTop = cur
-      raf = cur === target ? 0 : requestAnimationFrame(step)
-    }
-    const onWheel = (e) => {
-      if (e.ctrlKey) return // pinch-zoom
-      e.preventDefault()
-      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1
-      if (!raf) target = cur = el.scrollTop // pick up any scrolling done another way
-      target = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, target + e.deltaY * unit))
-      if (!raf) raf = requestAnimationFrame(step)
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => {
-      el.removeEventListener('wheel', onWheel)
-      cancelAnimationFrame(raf)
-    }
-  }, [ref, key])
-}
-
 export function Panel() {
   const active = useStore((s) => s.active)
+  const entered = useStore((s) => s.entered)
   const close = useStore((s) => s.close)
   // keep the last section mounted while the panel slides out
   const [shown, setShown] = useState(active)
+  const [modal, setModal] = useState(() => window.matchMedia('(max-width: 860px)').matches)
   const body = useRef()
+  const dialog = useRef()
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 860px)')
+    const change = () => setModal(query.matches)
+    query.addEventListener('change', change)
+    return () => query.removeEventListener('change', change)
+  }, [])
   useEffect(() => {
     if (active) setShown(active)
     if (body.current) body.current.scrollTop = 0
   }, [active])
-  useSmoothWheel(body, shown)
+  useEffect(() => {
+    if (!active || !entered || !dialog.current) return
+    const previous = document.activeElement
+    const siblings = modal ? [...dialog.current.parentElement.children].filter((el) => el !== dialog.current).map((el) => [el, el.inert]) : []
+    siblings.forEach(([el]) => { el.inert = true })
+    dialog.current.querySelector('button')?.focus({ preventScroll: true })
+    const trap = (e) => {
+      if (!modal || e.key !== 'Tab') return
+      const items = [...dialog.current.querySelectorAll('a[href],button:not([disabled]),[tabindex="0"]')].filter((el) => el.getClientRects().length)
+      const first = items[0], last = items.at(-1)
+      if (!dialog.current.contains(document.activeElement)) { e.preventDefault(); first?.focus() }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
+    }
+    document.addEventListener('keydown', trap)
+    return () => { document.removeEventListener('keydown', trap); siblings.forEach(([el, inert]) => { el.inert = inert }); if (previous?.isConnected) previous.focus({ preventScroll: true }) }
+  }, [active, shown, modal, entered])
   const s = shown && SECTIONS[shown]
   const Body = shown && BODIES[shown]
   return (
-    <aside className={`panel ${active ? 'is-open' : ''}`} aria-hidden={!active}>
+    <aside ref={dialog} className={`panel ${active && entered ? 'is-open' : ''}`} role={modal ? 'dialog' : 'region'} aria-modal={active && entered && modal ? true : undefined} aria-label={s?.label || 'Studio section'} aria-hidden={!active || !entered} inert={active && entered ? undefined : ''}>
       {s && (
         <div className="panel__scroll" ref={body} key={shown}>
           <div className="panel__head">

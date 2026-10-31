@@ -87,7 +87,6 @@ export function CameraRig() {
     c.draggingSmoothTime = 0.28 // a little glide behind the pointer, so looking around feels fluid
     setInput(c, false)
     c.setLookAt(...INTRO.pos, ...INTRO.target, false)
-    if (import.meta.env.DEV) window.__controls = c
 
     // While dragging, skip hover hit-testing: it checks every book and prop on each pointer move
     // and nothing can be hovered mid-drag anyway. It starts once the pointer actually moves, so a
@@ -116,17 +115,18 @@ export function CameraRig() {
     const c = ref.current
     if (!entered) return
     let cancelled = false
+    const motion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     unlock(c)
     setInput(c, false)
     if (active) {
       c.smoothTime = 0.65
-      c.setLookAt(...framed(VIEWS[active], wide), true)
+      c.setLookAt(...framed(VIEWS[active], wide), motion)
     } else if (peek) {
       c.smoothTime = 0.7
-      c.setLookAt(...PEEKS[peek].pos, ...PEEKS[peek].target, true)
+      c.setLookAt(...PEEKS[peek].pos, ...PEEKS[peek].target, motion)
     } else {
       c.smoothTime = 0.75
-      c.setLookAt(...homePos, ...HOME.target, true).then(() => {
+      c.setLookAt(...homePos, ...HOME.target, motion).then(() => {
         if (cancelled) return
         lock(c, homeRadius)
         setInput(c, true)

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, SoftShadows } from '@react-three/drei'
 import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
@@ -14,6 +14,7 @@ import { Bookshelf } from './Bookshelf'
 import { Credenza, Pegboard, Sign } from './Feature'
 import { Plants } from './Plants'
 import { CityWindow } from './CityWindow'
+const DevSceneTools = import.meta.env.DEV ? lazy(()=>import('./DevSceneTools')) : null
 
 // Every opaque mesh casts and receives shadows unless it opts out (glows, screens, glass).
 // The room never moves, so shadow maps are drawn once after load instead of every frame.
@@ -26,7 +27,7 @@ function ShadowSetup() {
       if (!o.isMesh) return
       const skip = o.userData.noShadow || o.material?.transparent || o.material?.isMeshBasicMaterial
       o.castShadow = !skip
-      o.receiveShadow = !o.material?.isMeshBasicMaterial
+      o.receiveShadow = !skip
     })
     gl.shadowMap.autoUpdate = false
     gl.shadowMap.needsUpdate = true
@@ -45,6 +46,7 @@ function ShadowSetup() {
 function FrameDriver() {
   const invalidate = useThree((s) => s.invalidate)
   useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const IDLE_FPS = 24
     const BUSY_FOR = 2500 // ms of full frame rate after any interaction
     let lastFrame = 0
@@ -56,7 +58,7 @@ function FrameDriver() {
     const unsubscribe = useStore.subscribe(wake) // opening a section, theme switch, etc.
     const loop = (now) => {
       raf = requestAnimationFrame(loop) // browsers stop this entirely in hidden tabs
-      if (now - lastActive < BUSY_FOR || now - lastFrame > 1000 / IDLE_FPS) {
+      if (now - lastActive < BUSY_FOR || (!reduced && now - lastFrame > 1000 / IDLE_FPS)) {
         lastFrame = now
         invalidate()
       }
@@ -102,6 +104,7 @@ export function Studio({ onReady }) {
       <Pegboard />
       <Plants />
       <CityWindow />
+      {DevSceneTools && <Suspense fallback={null}><DevSceneTools /></Suspense>}
       <Hotspots />
       <ShadowSetup />
       <FrameDriver />

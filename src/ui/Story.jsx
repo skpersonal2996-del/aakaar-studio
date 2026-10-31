@@ -59,6 +59,12 @@ export function Story() {
     const scroller = el.closest('.panel__scroll')
     const path = stroke.current
     if (!scroller || !layout || !path) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      path.style.strokeDashoffset = 0
+      setShown(STORY.length)
+      setDone(true)
+      return
+    }
     const total = path.getTotalLength()
     // the path only ever moves down, so find the length whose point sits at height y
     const lengthAt = (y) => {

@@ -5,6 +5,7 @@ import { Box, Cyl, Glow, Limb, Soft } from './parts'
 import { SmallPlant } from './Plants'
 import { Clickable } from './Interactive'
 import { LAYOUT } from './views'
+import { SurfaceMaterial } from './SurfaceMaterial'
 
 const SOFA = '#a7a39e'
 const RUST = '#b4501f'
@@ -17,21 +18,21 @@ function Pillow({ color, map, args = [0.46, 0.44, 0.16], ...props }) {
 function Couch() {
   const tex = useMemo(() => fabric('sofa3', '#d6d3cf', [4, 2]), [])
   const knit = useMemo(() => fabric('knit', '#d07a3c', [2, 2]), [])
-  const sofa = (args, position, r = 0.05) => <Soft args={args} position={position} radius={r} map={tex} color={SOFA} />
+  const sofa = (args, position, r = 0.05) => <Soft args={args} position={position} radius={r}><SurfaceMaterial kind="linen" repeat={[4,2]} color="#c7b9a8" normalStrength={.22} /></Soft>
   return (
     <group>
       {/* back run */}
       {sofa([3.9, 0.36, 0.98], [-4.0, 0.24, -4.42])}
       {sofa([3.9, 0.5, 0.26], [-4.0, 0.66, -4.8], 0.09)}
       {[-5.3, -4.0, -2.7].map((x) => (
-        <Soft key={x} args={[1.27, 0.16, 0.74]} radius={0.07} position={[x, 0.48, -4.25]} map={tex} color="#b2aea8" />
+        <Soft key={x} args={[1.27, 0.16, 0.74]} radius={0.07} position={[x, 0.48, -4.25]}><SurfaceMaterial kind="linen" repeat={[3,2]} color="#c9bdae" normalStrength={.2} /></Soft>
       ))}
       {sofa([0.22, 0.6, 0.98], [-1.94, 0.33, -4.42], 0.09)}
       {/* side run along the left wall */}
       {sofa([0.98, 0.36, 2.35], [-5.42, 0.24, -2.75])}
       {sofa([0.26, 0.5, 2.35], [-5.8, 0.66, -2.75], 0.09)}
       {[-3.35, -2.15].map((z) => (
-        <Soft key={z} args={[0.74, 0.16, 1.17]} radius={0.07} position={[-5.25, 0.48, z]} map={tex} color="#b2aea8" />
+        <Soft key={z} args={[0.74, 0.16, 1.17]} radius={0.07} position={[-5.25, 0.48, z]}><SurfaceMaterial kind="linen" repeat={[2,3]} color="#c9bdae" normalStrength={.2} /></Soft>
       ))}
       {sofa([0.98, 0.6, 0.22], [-5.42, 0.33, -1.5], 0.09)}
       {[
@@ -173,7 +174,7 @@ export function Lounge() {
     <group>
       <mesh position={[-3.6, 0.012, -3.0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[4.4, 3.4]} />
-        <meshStandardMaterial map={rugTex} roughness={1} />
+        <SurfaceMaterial kind="linen" map={rugTex} repeat={[12,9]} roughness={1} normalStrength={.65} sheen={.6} />
       </mesh>
       {/* the couch is where projects start: it opens "How we work" */}
       <Clickable id="process">

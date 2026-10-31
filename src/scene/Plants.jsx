@@ -6,19 +6,26 @@ import { Cyl } from './parts'
 
 // Leaf blade: base at the origin, grows along +y, arches towards +z and cups slightly.
 function leafGeometry(len, wid, bend, tipPow = 0.8) {
-  const g = new THREE.PlaneGeometry(1, 1, 4, 14)
+  const g = new THREE.PlaneGeometry(1, 1, len>.3?8:4, len>.3?24:12)
   const p = g.attributes.position
+  const colors=[]
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i)
     const t = p.getY(i) + 0.5
     const prof = Math.sin(Math.PI * Math.pow(t, tipPow))
-    p.setXYZ(i, x * wid * prof, t * len * (1 - t * bend * 0.25), t * t * bend * len - x * x * wid * 0.5)
+    const asymmetry=1+Math.sign(x)*.07*Math.sin(t*7)
+    const cup=-Math.pow(Math.abs(x)*2,1.7)*wid*.14*prof
+    const wave=Math.sin(t*26+x*8)*wid*.035*Math.abs(x)*prof
+    p.setXYZ(i,x*wid*prof*asymmetry,t*len*(1-t*bend*.25),t*t*bend*len+cup+wave)
+    const shade=.87+.10*Math.sin(t*Math.PI)+.03*Math.exp(-Math.abs(x)*20)
+    colors.push(shade,shade,shade)
   }
+  g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
   g.computeVertexNormals()
   return g
 }
 
-const leafMat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, side: THREE.DoubleSide })
+const leafMat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.68, vertexColors:true, side: THREE.DoubleSide })
 
 function Pot({ r = 0.2, h = 0.4, color = '#e9e4dc' }) {
   return (
@@ -32,7 +39,9 @@ function Pot({ r = 0.2, h = 0.4, color = '#e9e4dc' }) {
 function Sway({ amount = 0.02, speed = 0.6, children, ...props }) {
   const ref = useRef()
   const ph = useMemo(() => Math.random() * 10, [])
+  const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'),[])
   useFrame((s) => {
+    if(reduced.matches)return
     const t = s.clock.elapsedTime * speed + ph
     ref.current.rotation.z = Math.sin(t) * amount
     ref.current.rotation.x = Math.sin(t * 0.7) * amount * 0.6
@@ -112,7 +121,7 @@ export function Bamboo({ seed = 4, height = 2.4, ...props }) {
           </mesh>
         ))}
         <instancedMesh ref={ref} args={[geo, null, count]}>
-          <meshStandardMaterial roughness={0.6} side={THREE.DoubleSide} />
+          <meshStandardMaterial roughness={0.68} vertexColors side={THREE.DoubleSide} />
         </instancedMesh>
       </Sway>
     </group>
@@ -134,7 +143,7 @@ export function SmallPlant({ seed = 2, trailing = false, ...props }) {
       <Cyl args={[0.045, 0.035, 0.08, 16]} position={[0, 0.04, 0]} color="#d8cfc2" roughness={0.5} />
       {leaves.map((l, i) => (
         <mesh key={i} geometry={geo} position={l.p} rotation={[l.rot[0], l.rot[1], 0, 'YXZ']}>
-          <meshStandardMaterial color={i % 3 ? '#4f7f3a' : '#6a9a48'} roughness={0.6} side={THREE.DoubleSide} />
+          <meshStandardMaterial color={i % 3 ? '#4f7f3a' : '#6a9a48'} roughness={0.68} vertexColors side={THREE.DoubleSide} />
         </mesh>
       ))}
     </group>

@@ -1,8 +1,9 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { LAYOUT, ROOM } from './views'
-import { bwArt, plaster, poster, woodFloor, woodGrain } from './textures'
+import { bwArt, plaster, poster } from './textures'
 import { Box, Cyl, Glow } from './parts'
+import { SurfaceMaterial } from './SurfaceMaterial'
 
 const { W, D, H } = ROOM
 const WALL = '#2c2826'
@@ -19,7 +20,6 @@ function Wall({ size, color = WALL, ...props }) {
 
 export function SlatWall({ x0 = LAYOUT.slats[0], x1 = LAYOUT.slats[1] }) {
   const ref = useRef()
-  const map = useMemo(() => woodGrain('slat', 24, 30), [])
   const step = 0.07
   const count = Math.floor((x1 - x0) / step)
   useLayoutEffect(() => {
@@ -28,7 +28,7 @@ export function SlatWall({ x0 = LAYOUT.slats[0], x1 = LAYOUT.slats[1] }) {
     for (let i = 0; i < count; i++) {
       m.makeTranslation(x0 + i * step + step / 2, H / 2, -D / 2 + 0.05)
       ref.current.setMatrixAt(i, m)
-      c.setHSL(0.075, 0.36, 0.36 + ((i * 7919) % 13) / 300)
+      c.setRGB(.82 + (i % 7) * .018, .78 + (i % 5) * .018, .71 + (i % 4) * .018)
       ref.current.setColorAt(i, c)
     }
     ref.current.instanceMatrix.needsUpdate = true
@@ -38,7 +38,7 @@ export function SlatWall({ x0 = LAYOUT.slats[0], x1 = LAYOUT.slats[1] }) {
       <Box args={[x1 - x0, H, 0.02]} position={[(x0 + x1) / 2, H / 2, -D / 2 + 0.012]} color="#0c0806" roughness={1} />
       <instancedMesh ref={ref} args={[null, null, count]}>
         <boxGeometry args={[0.046, H, 0.055]} />
-        <meshStandardMaterial map={map} roughness={0.55} />
+        <SurfaceMaterial kind="oak" repeat={[1,2]} normalStrength={.18} roughness={.9} />
       </instancedMesh>
       {/* hidden cove light along the ceiling */}
       <Glow args={[x1 - x0, 0.02, 0.03]} position={[(x0 + x1) / 2, H - 0.07, -D / 2 + 0.16]} color={[4, 2.3, 1]} />
@@ -63,7 +63,7 @@ function Curtain({ width, folds, ...props }) {
   return (
     <group {...props}>
       <mesh geometry={geo} position={[0, (H - 0.12) / 2 + 0.02, 0]}>
-        <meshStandardMaterial color="#d9bfa6" roughness={1} side={THREE.DoubleSide} />
+        <SurfaceMaterial kind="linen" repeat={[5,4]} color="#d9c8b0" normalStrength={.2} side={THREE.DoubleSide} />
       </mesh>
       <Cyl args={[0.015, 0.015, width + 0.1]} rotation-z={Math.PI / 2} position={[0, H - 0.08, 0.04]} color="#1a1715" metalness={0.6} />
     </group>
@@ -100,13 +100,12 @@ function Track({ z, from, to, cans }) {
 }
 
 export function Room() {
-  const floor = useMemo(() => woodFloor(), [])
   return (
     <group>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0, 2]}>
         <planeGeometry args={[W, 14]} />
         {/* lightly glossy wood: picks up soft highlights from the environment without redrawing the room */}
-        <meshStandardMaterial map={floor} color="#b9a08a" roughness={0.42} metalness={0} envMapIntensity={1.6} />
+        <SurfaceMaterial kind="floor" repeat={[8,8.75]} rotation={Math.PI/2} color="#c9b6a0" roughness={1} normalStrength={.22} envMapIntensity={.8} clearcoat={.025} />
       </mesh>
       <Wall size={[W, H]} position={[0, H / 2, -D / 2]} />
       <Wall size={[D, H]} position={[-W / 2, H / 2, 0]} rotation-y={Math.PI / 2} />

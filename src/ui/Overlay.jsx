@@ -71,20 +71,21 @@ export function Overlay({ ready }) {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (e.target.closest('input,textarea,select,[contenteditable="true"]') || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'Escape') close()
       const n = Number(e.key)
       if (entered && n >= 1 && n <= NAV.length) focus(NAV[n - 1])
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [entered])
+  }, [entered, close, focus])
 
   useEffect(() => {
     if (!entered) return
     const off = () => setHint(false)
     const t = setTimeout(off, 9000)
     window.addEventListener('pointerdown', off, { once: true })
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); window.removeEventListener('pointerdown', off) }
   }, [entered])
 
   return (
@@ -145,9 +146,9 @@ export function Overlay({ ready }) {
         <span className="mono">Reset view</span>
       </button>
 
-      <nav className="dock" aria-label="Sections">
+      <nav className="dock" aria-label="Sections" id="studio-navigation">
         {NAV.map((id) => (
-          <button key={id} className={active === id ? 'is-active' : ''} onClick={() => (active === id ? close() : focus(id))}>
+          <button key={id} className={active === id ? 'is-active' : ''} aria-current={active === id ? 'page' : undefined} onClick={() => (active === id ? close() : focus(id))}>
             <span className="mono dock__index">{SECTIONS[id].index}</span>
             {SECTIONS[id].label}
           </button>

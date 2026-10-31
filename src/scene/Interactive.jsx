@@ -68,7 +68,7 @@ function Hotspot({ id, position, size = 1 }) {
   const phase = position[0] * 1.7
 
   useFrame((state, dt) => {
-    const t = state.clock.elapsedTime
+    const t = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : state.clock.elapsedTime
     const g = ref.current
     // slow, calm motion: a gentle bob, an unhurried ripple and a soft breathing core
     g.position.y = position[1] + Math.sin(t * 0.8 + phase) * 0.03

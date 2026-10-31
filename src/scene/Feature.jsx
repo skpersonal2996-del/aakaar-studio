@@ -8,6 +8,7 @@ import { Box, Cyl, Glow, Soft } from './parts'
 import { Clickable } from './Interactive'
 import { SmallPlant } from './Plants'
 import { LAYOUT } from './views'
+import { SurfaceMaterial } from './SurfaceMaterial'
 
 const SLAT_MID = (LAYOUT.slats[0] + LAYOUT.slats[1]) / 2
 
@@ -80,7 +81,7 @@ export function Credenza() {
   const wood = useMemo(() => woodGrain('cred', 20, 20), [])
   return (
     <group position={[SLAT_MID, 0, -4.68]}>
-      <Soft args={[2.9, 0.52, 0.45]} radius={0.015} position={[0, 0.34, 0]} map={wood} color="#ffffff" roughness={0.45} />
+      <Soft args={[2.9, 0.52, 0.45]} radius={0.015} position={[0, 0.34, 0]}><SurfaceMaterial kind="walnut" repeat={[2,1]} color="#d0bda5" normalStrength={.18} roughness={.8} /></Soft>
       {[-0.725, 0, 0.725].map((x) => (
         <Box key={x} args={[0.004, 0.46, 0.004]} position={[x, 0.34, 0.227]} color="#0a0705" />
       ))}

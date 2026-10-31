@@ -1,0 +1,25 @@
+/* Original room composition and chrome, with local fonts and responsive fixes. */
+:root { --round:'Comfortaa Variable','Space Grotesk Variable',sans-serif; --sans:'Space Grotesk Variable',system-ui,sans-serif; }
+.stage,.ui { overflow:clip; }
+button:focus-visible,a:focus-visible { outline:2px solid #ffbd83; outline-offset:4px; }
+.panel[aria-hidden='true'] { visibility:hidden; pointer-events:none; }
+.panel.is-open { visibility:visible; }
+.scene-failure { position:fixed; z-index:4; left:50%; top:26%; transform:translateX(-50%); max-width:320px; padding:16px; color:#eadacf; background:#211916e8; border:1px solid #ffffff22; border-radius:12px; font-size:13px; text-align:center; }
+.capture-room .ui { display:none; }
+@media(min-width:861px) and (max-width:1280px) {
+  .reset { bottom:96px; }
+}
+@media(max-width:860px) {
+  .panel { top:auto; bottom:10px; height:58svh; max-height:calc(100svh - 87px); }
+  .dock { display:grid; grid-template-columns:repeat(3,1fr); overflow:visible; }
+  .dock button { justify-content:center; padding:12px 5px; font-size:10px; gap:6px; }
+  .signature { bottom:134px; }
+  .reset { bottom:130px; }
+  .hint { bottom:177px; font-size:8px; }
+  .ui.is-focused .top__right { visibility:hidden; }
+  .loader__tag { margin-bottom:36px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*:before,*:after { animation:none!important; scroll-behavior:auto!important; transition-duration:.01ms!important; }
+  .beat__text,.beat__emoji,.tale__end { opacity:1; transform:none; }
+}

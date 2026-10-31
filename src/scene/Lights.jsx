@@ -10,13 +10,13 @@ import { LAYOUT } from './views'
 const L = (color, intensity) => ({ color, intensity })
 
 const lights = (mid) => [
-  { type: 'ambient', warm: L('#ffd2a8', 0.22), night: L('#2a3470', 0.2) },
-  { type: 'hemi', warm: L('#ffcf9a', 0.4), night: L('#3a4690', 0.32), ground: ['#2a1a0e', '#0b0718'] },
+  { type: 'ambient', warm: L('#ffd2a8', 0.22), night: L('#596399', 0.32) },
+  { type: 'hemi', warm: L('#ffcf9a', 0.4), night: L('#6573ad', 0.48), ground: ['#2a1a0e', '#0b0718'] },
   // broad key and a front fill so every part of the room reads clearly
-  { type: 'dir', position: [-3, 3.5, 4], warm: L('#ffc489', 1.1), night: L('#5868d0', 0.45) },
-  { type: 'dir', position: [1, 2.5, 6], warm: L('#fff1e2', 0.45), night: L('#ff6fb5', 0.2) },
+  { type: 'dir', position: [-3, 3.5, 4], warm: L('#ffc489', 1.1), night: L('#8a98df', 0.7) },
+  { type: 'dir', position: [1, 2.5, 6], warm: L('#fff1e2', 0.45), night: L('#ffa6cf', 0.32) },
   // key over the shared desk
-  { type: 'spot', position: [0.3, 4.1, 2.6], target: [0.2, 0.6, 0.9], angle: 0.62, shadow: 2048, warm: L('#ffc58f', 70), night: L('#b3b0ff', 28) },
+  { type: 'spot', position: [0.3, 4.1, 2.6], target: [0.2, 0.6, 0.9], angle: 0.62, shadow: 2048, warm: L('#ffc58f', 70), night: L('#d2cdff', 40) },
   // grazing washes on the slat wall — pink at night
   { type: 'spot', position: [mid - 0.9, 4.1, -3.7], target: [mid - 0.9, 0.2, -5], angle: 0.85, shadow: 1024, warm: L('#ffb46e', 38), night: L('#ff4f9f', 30) },
   { type: 'spot', position: [mid + 0.9, 4.1, -3.7], target: [mid + 0.9, 0.2, -5], angle: 0.85, warm: L('#ffb46e', 38), night: L('#ff4f9f', 30) },
@@ -34,11 +34,11 @@ const lights = (mid) => [
   // light spilling in from the city window: low golden sunset, cool moonlight at night
   { type: 'spot', position: [7.2, 2.6, -2.0], target: [2.5, 0.2, -1.5], angle: 0.55, warm: L('#ff9d5c', 34), night: L('#5a72ff', 14) },
   // soft front fill so the open side of the room is not black
-  { type: 'point', position: [0.5, 2.8, 5.0], distance: 12, decay: 1.4, warm: L('#ffb47a', 10), night: L('#3d4fb8', 7) },
+  { type: 'point', position: [0.5, 2.8, 5.0], distance: 12, decay: 1.4, warm: L('#ffb47a', 10), night: L('#8799dd', 12) },
 ]
 
 const BACKGROUND = { warm: new THREE.Color('#0b0908'), night: new THREE.Color('#06050d') }
-const ENVIRONMENT = { warm: 0.4, night: 0.14 }
+const ENVIRONMENT = { warm: 0.4, night: 0.28 }
 
 // Spot light whose target is placed once (the target object is not part of the scene graph).
 function Spot({ target, onLight, ...props }) {
@@ -67,7 +67,7 @@ export function Lights() {
   const tmp = useMemo(() => new THREE.Color(), [])
 
   useFrame((_, dt) => {
-    const k = 1 - Math.exp(-Math.min(dt, 0.1) * 3.5)
+    const k = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1 - Math.exp(-Math.min(dt, 0.1) * 3.5)
     specs.forEach((l, i) => {
       const light = refs.current[i]
       if (!light) return

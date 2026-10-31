@@ -219,7 +219,7 @@ export const photoCard = ({ name, card, color, photo }) =>
       x.fillRect(136, 14, 48, 10) // lanyard slot
       x.fillStyle = '#fff'
       x.textAlign = 'center'
-      x.font = '500 34px "Comfortaa", sans-serif'
+      x.font = '500 34px "Comfortaa Variable", sans-serif'
       x.fillText('aakaar', 160, 64)
       x.fillStyle = '#d9d2c7'
       x.fillRect(frame.x, frame.y, frame.w, frame.h)
@@ -231,7 +231,7 @@ export const photoCard = ({ name, card, color, photo }) =>
         x.drawImage(img, (img.width - w) / 2, (img.height - h) * 0.2, w, h, frame.x, frame.y, frame.w, frame.h)
       }
       x.fillStyle = '#1b1b1b'
-      x.font = '700 34px "Space Grotesk", sans-serif'
+      x.font = '700 34px "Space Grotesk Variable", sans-serif'
       x.fillText(name, 160, 386)
       x.fillStyle = color
       x.font = '500 20px "JetBrains Mono", monospace'
@@ -258,7 +258,7 @@ export const idCard = ({ company, color, name, role, years }) =>
     x.fillStyle = 'rgba(0,0,0,.25)'
     x.fillRect(108, 14, 40, 10)
     x.fillStyle = '#fff'
-    x.font = '700 26px "Space Grotesk", sans-serif'
+    x.font = '700 26px "Space Grotesk Variable", sans-serif'
     x.textAlign = 'center'
     x.fillText(company, 128, 66)
     // little illustrated portrait
@@ -285,7 +285,7 @@ export const idCard = ({ company, color, name, role, years }) =>
     if (pr() > 0.5) x.fillRect(107, 128, 7, 30)
     x.restore()
     x.fillStyle = '#1b1b1b'
-    x.font = '700 24px "Space Grotesk", sans-serif'
+    x.font = '700 24px "Space Grotesk Variable", sans-serif'
     x.fillText(name, 128, 236)
     x.fillStyle = '#555'
     x.font = '500 17px "JetBrains Mono", monospace'
@@ -312,7 +312,7 @@ export const laptopScreen = (variant) =>
     })
     if (variant === 'projects') {
       x.fillStyle = '#ff6fae'
-      x.font = '700 64px "Space Grotesk", sans-serif'
+      x.font = '700 64px "Space Grotesk Variable", sans-serif'
       x.fillText('PROJECTS', 60, 130)
       x.fillStyle = '#8b8590'
       x.font = '500 22px "JetBrains Mono", monospace'
@@ -377,7 +377,7 @@ export const phoneScreen = () =>
     x.fillRect(0, 0, 200, 410)
     x.fillStyle = '#fff'
     x.textAlign = 'center'
-    x.font = '600 46px "Space Grotesk", sans-serif'
+    x.font = '600 46px "Space Grotesk Variable", sans-serif'
     x.fillText('23:25', 100, 110)
     x.font = '500 15px "JetBrains Mono", monospace'
     x.fillText('1 new message', 100, 300)
@@ -429,7 +429,7 @@ export const poster = () =>
     x.fillStyle = '#f1ece3'
     x.fillRect(0, 0, 360, 500)
     x.fillStyle = '#1c1a18'
-    x.font = '500 50px "Space Grotesk", sans-serif'
+    x.font = '500 50px "Space Grotesk Variable", sans-serif'
     ;['Good', 'Design', 'Builds', 'Better', 'Futures'].forEach((w, i) => x.fillText(w, 34, 92 + i * 64))
     x.fillStyle = '#c4592b'
     x.fillRect(34, 420, 46, 8)
@@ -480,8 +480,8 @@ export const signTexture = (name, tagline, halo = '#ff9a3d', face = '#fff3e2', f
       x.fillStyle = face
       x.fillText(text, 1024, y)
     }
-    draw(name, '500 400px "Comfortaa"', 400, halo, face, 80, '0px')
-    draw(tagline.toUpperCase(), '600 62px "Space Grotesk"', 760, halo, faceSmall, 26, '18px')
+    draw(name, '500 400px "Comfortaa Variable"', 400, halo, face, 80, '0px')
+    draw(tagline.toUpperCase(), '600 62px "Space Grotesk Variable"', 760, halo, faceSmall, 26, '18px')
     return toTex(c)
   })
 
@@ -556,7 +556,7 @@ export const bookSpine = ({ key, title, author, bg, ink, accent = ink, upright, 
     x.fillRect(long * 0.035, short * 0.12, Math.max(2, long * 0.008), short * 0.76)
     x.fillRect(long * 0.957, short * 0.12, Math.max(2, long * 0.008), short * 0.76)
     x.globalAlpha = 1
-    const family = serif ? 'Georgia, "Times New Roman", serif' : '"Space Grotesk", sans-serif'
+    const family = serif ? 'Georgia, "Times New Roman", serif' : '"Space Grotesk Variable", sans-serif'
     x.fillStyle = ink
     x.textBaseline = 'middle'
     // author at the far end, small
