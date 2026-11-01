@@ -19,9 +19,9 @@ const PROP = { chair: `${base}studio/office-chair.glb`, laptop: `${base}studio/l
 // person says hi (blender/seat_meshy_character.py). The legs keep the typing clip, so they stay seated.
 const UPPER = new Set(['Spine', 'Spine01', 'Spine02', 'neck', 'Head', ...['Left', 'Right'].flatMap((side) =>
   ['Shoulder', 'Arm', 'ForeArm', 'Hand', 'Fingers1', 'Fingers2'].map((b) => side + b))])
-// The chibi rigs type with their heads level, looking over the laptops; this tilt (radians, about the
+// Both casts type with their heads level, looking over the laptops; this tilt (radians, about the
 // character's own left-right axis) bows the head and neck towards the screen. It eases off while they wave.
-const HEAD_TILT = { chibi: 0.3, classic: 0 }
+const HEAD_TILT = { chibi: 0.3, classic: 0.25 }
 const TILT_SHARE = [['neck', 0.3], ['Head', 0.7]]
 const UP = new THREE.Vector3(0, 1, 0)
 const bone = (track) => track.name.split('.')[0]
@@ -34,7 +34,8 @@ function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props 
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
   const actions = useRef({})
   const tilt = useRef(1)
-  const neckBones = useMemo(() => TILT_SHARE.map(([name, share]) => [actor.getObjectByName(name), share]).filter(([b]) => b), [actor])
+  const neckBones = useMemo(() => TILT_SHARE.map(([name, share]) => [actor.getObjectByName(name), share])
+    .filter(([b]) => b).map(([b, share]) => [b, share, b.quaternion.clone()]), [actor])
   const tmp = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), axis: new THREE.Vector3() }), [])
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
   const [hover, setHover] = useState(false)
@@ -87,13 +88,17 @@ function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props 
   }
 
   useFrame((_, delta) => {
-    mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05)) // re-poses every frame, so the tilt never accumulates
+    // The typing clip has no head or neck keys, so the mixer leaves those bones alone: put back last
+    // frame's untilted pose first, or the tilt would add up frame after frame.
+    if (headTilt) for (const [b, , untilted] of neckBones) b.quaternion.copy(untilted)
+    mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05))
     if (!headTilt) return
     const waving = actions.current.wave?.isRunning()
     tilt.current += ((waving ? 0 : 1) - tilt.current) * (1 - Math.exp(-Math.min(delta, 0.1) * 6))
     actor.getWorldQuaternion(tmp.p)
-    tmp.axis.set(0, 0, 1).applyQuaternion(tmp.p).cross(UP).normalize() // the rigs' +z points behind them, so this pitches down
-    for (const [b, share] of neckBones) {
+    tmp.axis.set(0, 0, 1).applyQuaternion(tmp.p).cross(UP).negate().normalize() // up × forward: pitches the face down
+    for (const [b, share, untilted] of neckBones) {
+      untilted.copy(b.quaternion)
       // Rotate about a world axis: local' = parent⁻¹ · q · parent · local
       b.parent.getWorldQuaternion(tmp.p)
       tmp.q.setFromAxisAngle(tmp.axis, headTilt * share * tilt.current)
