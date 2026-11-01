@@ -3,12 +3,15 @@
 Run on the seated room, studio-adult.blend (place_characters.py), with Blender 5.2 and a Metal GPU, then
 `npm run assets:room`:
 blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/bake_cozy_room.py -- [lightmap_size] [samples]
+The spacious room bakes the same way with its look-dev and mood (studio-spacious-adult.blend):
+  ... -- 4096 256 lookdev_spacious.py dark|cream
 Characters, office chairs and laptops stay live on the website (each character pair sits in its own
 spot), so they only cast shadows into the bake.
 
 Outputs in blender/generated/room-bake/ (all lighting on one shared 'Bake' UV set):
   room.glb             'Room · baked' (one merged mesh, albedo atlas on the Bake UV), 'Textured · props'
-                       (photos, text, CC0 props and leaves keeping their own textures on uv0, Bake on uv1)
+                       (photos, text, CC0 props and leaves keeping their own textures on uv0, Bake on uv1),
+                       'Glossy · desk top' (walnut grain on uv0, Bake on uv1; reflective on the website)
                        and glow meshes ('Glow · …') with HDR emission colours in their material extras
   room-albedo.png      diffuse colour atlas for the merged room (noise free, 4096)
   room-light-{warm,night}.png  denoised diffuse direct+indirect lighting, sRGB-encoded after scaling
@@ -18,15 +21,18 @@ import bpy, bmesh, json, math, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-OUT = ROOT / 'generated/room-bake'  # packaged for the web by `npm run assets:room`
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 LIGHT_SIZE = int(args[0]) if args else 4096
 SAMPLES = int(args[1]) if len(args) > 1 else 256
 ALBEDO_SIZE = 4096
 MAX_FACES = 12000  # decimate heavy CC0 props for the web
 
-LOOK = {'__file__': str(ROOT / 'lookdev_cozy.py')}
-exec((ROOT / 'lookdev_cozy.py').read_text(), LOOK)
+LOOKDEV = args[2] if len(args) > 2 else 'lookdev_cozy.py'
+MOOD = args[3] if len(args) > 3 else 'dark'
+LOOK = {'__file__': str(ROOT / LOOKDEV), 'MOOD': MOOD}
+# Packaged for the web by `npm run assets:room [-- spacious-<mood>]`; the cozy room keeps its own folder.
+OUT = ROOT / ('generated/room-bake' if LOOKDEV == 'lookdev_cozy.py' else f'generated/room-bake-spacious-{MOOD}')
+exec((ROOT / LOOKDEV).read_text(), LOOK)
 scene = bpy.context.scene
 O = bpy.data.objects
 REACT_OWNED = {'Mesh_499', 'Mesh_603', 'Mesh_604', 'Mesh_605'}  # sign glow and city view stay live in React
@@ -76,6 +82,12 @@ glows = [o for o in sources if emits(o)]
 textured = [o for o in sources if o not in glows and (cutout(o) or detailed(o))]
 static = [o for o in sources if o not in glows and o not in textured]
 
+
+def glossy(o):
+    # The lacquered desk top is lit like the room but kept as its own mesh: the website draws its walnut grain
+    # at full resolution and adds reflections, which the shared albedo atlas cannot.
+    return any(s.material and s.material.name.startswith('Glossy walnut') for s in o.material_slots)
+
 bake_col = bpy.data.collections.new('05 · Web bake'); scene.collection.children.link(bake_col)
 
 
@@ -106,7 +118,7 @@ def join(objs, name):
     bpy.ops.object.select_all(action='DESELECT')
     for o in objs: o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
-    assert bpy.ops.object.join() == {'FINISHED'}
+    if len(objs) > 1: assert bpy.ops.object.join() == {'FINISHED'}
     objs[0].name = objs[0].data.name = name
     return objs[0]
 
@@ -198,9 +210,11 @@ for _ in range(30):
 shelf(lo, place=True)
 print('BAKE packed', len(charts), 'parts at', round(lo * LIGHT_SIZE, 1), 'lightmap px/m', flush=True)
 
-room = join(parts, 'Room · baked')
+desk_copies = [p for p, src in zip(parts, static) if glossy(src)]
+room = join([p for p in parts if p not in desk_copies], 'Room · baked')
+desk = join(desk_copies, 'Glossy · desk top')
 props = join(detail_copies, 'Textured · props')
-lit = [room, props]
+lit = [room, desk, props]
 for o in lit: o.data.uv_layers[0].active_render = True
 me = room.data
 print('BAKE uv done', len(me.polygons), 'faces', flush=True)
@@ -280,6 +294,23 @@ for g in glow_copies:
             p = nt.nodes.new('ShaderNodeBsdfPrincipled'); p.inputs['Base Color'].default_value = (0, 0, 0, 1)
             nt.links.new(tex.outputs['Color'], p.inputs['Emission Color']); p.inputs['Emission Strength'].default_value = 1
             nt.links.new(p.outputs[0], next(n for n in nt.nodes if n.bl_idname == 'ShaderNodeOutputMaterial').inputs[0])
+# Glossy desk top: the walnut grain on a planar 'Grain' UV (uv0, tiled as in Blender) and the light on 'Bake' (uv1).
+dm = desk.data; wood = dm.materials[0].node_tree.nodes
+grain = next(n.image for n in wood if n.bl_idname == 'ShaderNodeTexImage' and 'diff' in n.image.filepath)
+tile = wood['Mapping'].inputs['Scale'].default_value[0]
+tint = list(next(n for n in wood if n.bl_idname == 'ShaderNodeMix').inputs['B'].default_value)[:3]
+bake_uv = np.empty(len(dm.loops) * 2, np.float32); dm.uv_layers['Bake'].data.foreach_get('uv', bake_uv)
+while dm.uv_layers: dm.uv_layers.remove(dm.uv_layers[0])
+xy = np.array([dm.vertices[l.vertex_index].co[:2] for l in dm.loops], np.float32) * tile
+dm.uv_layers.new(name='Grain').data.foreach_set('uv', xy.ravel())
+dm.uv_layers.new(name='Bake').data.foreach_set('uv', bake_uv)
+gloss = bpy.data.materials.new('Desk · glossy walnut'); gloss.use_nodes = True; nt = gloss.node_tree
+tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = grain
+uv_node = nt.nodes.new('ShaderNodeUVMap'); uv_node.uv_map = 'Grain'; nt.links.new(uv_node.outputs[0], tex.inputs['Vector'])
+nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+gloss['web_gloss'] = True; gloss['web_tint'] = tint
+gloss['web_light_scale'] = scales['warm']; gloss['web_light_scale_night'] = scales['night']
+dm.materials.clear(); dm.materials.append(gloss)
 # Textured parts: the website only needs each picture (and its alpha cut-out) on uv0.
 pictures = {}
 for s in props.material_slots:
@@ -302,7 +333,7 @@ for s in props.material_slots:
         pictures[key] = pic
     s.material = pictures[key]
 bpy.ops.object.select_all(action='DESELECT')
-for o in [room, props, *glow_copies]: o.select_set(True)
+for o in [room, desk, props, *glow_copies]: o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=str(OUT / 'room.glb'), use_selection=True, export_format='GLB',
                           export_materials='EXPORT', export_extras=True, export_texcoords=True, export_normals=False,
                           export_apply=True, export_yup=True, export_image_format='WEBP', export_image_quality=85)

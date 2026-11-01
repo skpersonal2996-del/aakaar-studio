@@ -1,4 +1,4 @@
-"""Download the CC0 Poly Haven texture sets used by the Blender-built furniture (2K JPG maps).
+"""Download the CC0 Poly Haven texture sets used by the Blender-built furniture and room surfaces (2K JPG maps).
 
 python3 blender/fetch_polyhaven_textures.py
 Writes blender/source/polyhaven/textures/<asset>/<map>.jpg (diff, nor_gl, rough, disp).
@@ -6,7 +6,8 @@ Writes blender/source/polyhaven/textures/<asset>/<map>.jpg (diff, nor_gl, rough,
 import json, urllib.request
 from pathlib import Path
 
-TEXTURES = ['black_walnut_veneer_02', 'black_oak_veneer', 'hessian_230', 'oak_wood_planks']
+TEXTURES = ['black_walnut_veneer_02', 'black_oak_veneer', 'hessian_230', 'oak_wood_planks',
+            'rough_linen', 'grey_plaster', 'marble_01']  # the last three: curtains, walls, coffee table
 MAPS = {'Diffuse': 'diff', 'nor_gl': 'nor_gl', 'Rough': 'rough', 'Displacement': 'disp'}
 OUT = Path(__file__).resolve().parent / 'source/polyhaven/textures'
 

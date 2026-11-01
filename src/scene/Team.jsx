@@ -114,7 +114,7 @@ function Seat({ who, cast, intro, phase }) {
     <>
       <SeatedPerson model={url(MODELS[cast][who])} intro={intro} peekId={who} phase={phase} position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
-      <Prop src={PROP.laptop} position={s.laptop} rotation-y={s.laptopRotation} />
+      <Prop src={PROP.laptop} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />
     </>
   )
 }

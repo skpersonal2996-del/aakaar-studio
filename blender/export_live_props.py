@@ -1,6 +1,6 @@
 """Export the props that stay live on the website (they move with each character pair): chair and laptop.
 
-blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/export_live_props.py
+blender --background blender/studio-assembled.blend --python-exit-code 1 --python blender/export_live_props.py
 Writes blender/generated/live/<name>.glb at room scale, base centred on the origin, front facing -Y,
 reduced to about 20K triangles. `npm run assets:room` compresses them into public/studio/.
 """

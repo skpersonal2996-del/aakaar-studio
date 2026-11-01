@@ -20,11 +20,15 @@ ROOT = Path(__file__).resolve().parent
 args = sys.argv[sys.argv.index('--') + 1:]
 name, seat = args[0], args[1]
 scale = float(args[2]) if len(args) > 2 else 1.0
-chibi = 'chibi' in name
-# Chibi waves with the hand further from the camera (the near one would cover the big head); classic with
-# the near hand. The camera is to the developer's right and the designer's left.
-wave_side = ('Left' if seat == 'vinay' else 'Right') if chibi else ('Right' if seat == 'vinay' else 'Left')
+wave_side = 'Right' if seat == 'vinay' else 'Left'  # the hand nearer the camera (see the wave below)
 HIP_Z, DESK_Z = .53, .765
+# Laptop size for this cast (place_characters.py scales laptop.glb by it): the chibi hands are big for their
+# bodies, so their laptop is larger to keep the fingers on the keys.
+LAPTOP_SCALE = 1.35 if 'chibi' in name else 1.15
+# The laptop's near edge from the desk edge (round chibi bellies sit further back), and the wrists 3 cm
+# onto the laptop: the desk edge is DESK_BACK behind the wrists. place_characters.py reads both.
+LAPTOP_INSET = .07 if 'chibi' in name else .1
+DESK_BACK = LAPTOP_INSET + .03
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -64,7 +68,7 @@ for side in ('Left', 'Right'):
     toe.tail = toe.head + (toe.head - foot.head).normalized() * .05 / arm.scale.x
 eb['Hips'].tail = eb['Spine02'].head
 eb['head_end'].tail = eb['head_end'].head + Vector((0, 0, .05 / arm.scale.x))
-fingers = {}
+fingers, hand_dir = {}, {}
 for side in ('Left', 'Right'):
     hand = arm.data.edit_bones[f'{side}Hand']
     elbow = arm.data.edit_bones[f'{side}ForeArm'].head
@@ -80,7 +84,12 @@ for side in ('Left', 'Right'):
     b2 = arm.data.edit_bones.new(f'{side}Fingers2'); b2.head, b2.tail, b2.parent = mid, wrist + d * reach, b1
     b2.use_connect = True
     for b in (b1, b2): b.roll = hand.roll
-    fingers[side] = (ids, along, reach)
+    # Twist bone for the lower forearm: rolling the hand palm-down is spread from elbow to wrist through it, as
+    # a real forearm turns, instead of wringing the cuff around the wrist.
+    fa = arm.data.edit_bones[f'{side}ForeArm']
+    tw = arm.data.edit_bones.new(f'{side}ForeArmTwist'); tw.head, tw.tail = fa.head.lerp(fa.tail, .5), fa.tail.copy()
+    tw.parent, tw.roll = fa, fa.roll
+    fingers[side] = (ids, along, reach); hand_dir[side] = np.array(d)
 bpy.ops.object.mode_set(mode='OBJECT')
 for side, (ids, along, reach) in fingers.items():
     hand_group = mesh.vertex_groups[f'{side}Hand']
@@ -91,6 +100,48 @@ for side, (ids, along, reach) in fingers.items():
         w1 = min(1, (f - .4) / .14)            # blends from the palm into the fingers
         w2 = min(1, max(0, (f - .7) / .1))
         hand_group.add([i], 1 - w1, 'REPLACE'); g1.add([i], w1 * (1 - w2), 'REPLACE'); g2.add([i], w1 * w2, 'REPLACE')
+# Palm direction in each hand bone's frame: the palm is the flattest part of the hand (least spread across
+# its thickness), and in Meshy's rest pose it faces down. Rigs differ in how the hand bone is rolled.
+# Forearm skin and sleeve: weight shifts to the twist bone from the middle of the forearm to the wrist, and the
+# cuff (hand-weighted but behind the wrist) follows the twist bone rather than the hand.
+for side in ('Left', 'Right'):
+    fa = D[f'{side}ForeArm']; head, tail = fa.head_local, fa.tail_local; axis = tail - head
+    g_fa, g_hand = mesh.vertex_groups[f'{side}ForeArm'], mesh.vertex_groups[f'{side}Hand']
+    g_tw = mesh.vertex_groups.new(name=f'{side}ForeArmTwist')
+    for v in mesh.data.vertices:
+        w = {g.group: g.weight for g in v.groups}
+        if g_fa.index not in w and g_hand.index not in w: continue
+        s = (mesh_to_arm @ v.co - head).dot(axis) / axis.length_squared  # 0 at the elbow, 1 at the wrist
+        k = min(1, max(0, (s - .25) / .75))
+        k = k * k * (3 - 2 * k)
+        moved = w.get(g_fa.index, 0) * k
+        if s < 1.02: moved += w.get(g_hand.index, 0) * min(1, (1.02 - s) / .04)  # the cuff
+        if moved < 1e-3: continue
+        if g_fa.index in w: g_fa.add([v.index], w[g_fa.index] * (1 - k), 'REPLACE')
+        if g_hand.index in w and s < 1.02: g_hand.add([v.index], w[g_hand.index] * (1 - min(1, (1.02 - s) / .04)), 'REPLACE')
+        g_tw.add([v.index], moved, 'REPLACE')
+
+palm_rest, flatness = {}, {}
+down_arm = (W().to_3x3().inverted() @ Vector((0, 0, -1))).normalized()
+for side, (ids, along, reach) in fingers.items():
+    pts = np.array([mesh_to_arm @ Vector(coords[i]) for i, t in zip(ids, along) if t < reach * .45])
+    if 'chibi' in name:
+        # Stubby chibi palms are about as short as they are thick, so their least spread can run along the hand
+        # (a roll about the hand's length then has nothing to aim). Measure the spread across the hand only.
+        d = hand_dir[side]; pts = pts - np.outer(pts @ d, d)
+    spread, axes = np.linalg.eigh(np.cov((pts - pts.mean(0)).T))
+    n = Vector(axes[:, 0])
+    if 'chibi' in name:
+        spread, n = spread[1:], Vector(axes[:, 1])  # axes[:, 0] is the hand's length (no spread left along it)
+    if n.dot(down_arm) < 0: n = -n
+    palm_rest[side], flatness[side] = n, spread[0] / spread[1]
+# A half-closed hand has no clear flat side: mirror the flatter hand's palm across the body (rigs are symmetric).
+flat, other = sorted(palm_rest, key=flatness.get)
+print('PALM flatness', {k: round(v, 3) for k, v in flatness.items()}, flush=True)
+if flatness[other] > 1.6 * flatness[flat]:
+    palm_rest[other] = Vector((-palm_rest[flat].x, palm_rest[flat].y, palm_rest[flat].z))
+for side in palm_rest:
+    palm_rest[side] = (D[f'{side}Hand'].matrix_local.to_3x3().inverted() @ palm_rest[side]).normalized()
 
 # --- rigid head and hair -------------------------------------------------------------------------
 # The face and hair must not stretch with the arms: everything above the neck, plus long hair (dark,
@@ -138,6 +189,11 @@ def rotate_world(bone, axis, angle):
 def ik(bone, target, pole, want):
     pb = P[bone]; con = pb.constraints.new('IK'); con.target = target; con.pole_target = pole
     con.chain_count = 2; con.use_stretch = False; con.iterations = 200
+    bend(con, pb, want)
+    return con
+
+
+def bend(con, pb, want):
     best = (1e9, 0)
     for i in range(48):  # find the pole angle that bends the joint where we want it
         con.pole_angle = -math.pi + i * math.tau / 48; bpy.context.view_layer.update()
@@ -146,37 +202,156 @@ def ik(bone, target, pole, want):
     con.pole_angle = best[1]; bpy.context.view_layer.update()
 
 
-for bone in ('Spine02', 'Spine01', 'Spine'): rotate_world(bone, (1, 0, 0), math.radians(-3))  # lean slightly in
+for bone in ('Spine02', 'Spine01', 'Spine'): rotate_world(bone, (1, 0, 0), math.radians(-5))  # lean in towards the screen
 rotate_world('Head', (1, 0, 0), math.radians(-6))                                              # look at the screen
 shoulder = {s: world(D[f'{s}Arm'].head_local) for s in ('Left', 'Right')}
-arm_len = (D['LeftArm'].head_local - D['LeftForeArm'].head_local).length * arm.scale.x \
-    + (D['LeftForeArm'].head_local - D['LeftHand'].head_local).length * arm.scale.x
+upper = (D['LeftArm'].head_local - D['LeftForeArm'].head_local).length * arm.scale.x
+fore = (D['LeftForeArm'].head_local - D['LeftHand'].head_local).length * arm.scale.x
 leg_len = (D['LeftUpLeg'].head_local - D['LeftLeg'].head_local).length * arm.scale.x
 shin = (D['LeftLeg'].head_local - D['LeftFoot'].head_local).length * arm.scale.x
 ankle_z = max(.09 * scale, HIP_Z - shin)  # feet down, as low as the shin allows (chibi feet may hang)
-wrists = {}
+wrists, tips, elbows = {}, {}, {}
 for side, sign in (('Left', 1), ('Right', -1)):
     knee_y = -leg_len * .95
     target = empty(f'{side} ankle', (sign * .1 * scale, knee_y - .02, ankle_z))
     ik(f'{side}Leg', target, empty(f'{side} knee pole', (sign * .12, -1.0, HIP_Z + .2)), (sign * .1, knee_y, HIP_Z + .02))
-    sh = shoulder[side]
-    dz = DESK_Z + .04 - sh.z; dx = sign * .09 - sh.x
-    reach = arm_len * .9
-    dy = -math.sqrt(max(.01, reach ** 2 - dz ** 2 - dx ** 2))
-    wrist = empty(f'{side} wrist', (sign * .09, sh.y + dy, DESK_Z + .04))
-    ik(f'{side}ForeArm', wrist, empty(f'{side} elbow pole', (sign * .4, .1, sh.z - .1)),
-       ((sh.x + wrist.location.x) / 2 + sign * .12, sh.y + dy * .45, sh.z - .14))
+    # Typing posture: the upper arm hangs down and a little forward with the elbow by the body, and the
+    # forearm runs forward to the keys, about level. Short chibi arms angle the upper arm further forward
+    # so the forearm never climbs to the keyboard from below the desk.
+    sh = shoulder[side]; wz = DESK_Z + .04
+    # Elbow a little forward of the body, but never below the desk top: the forearms rest on the desk.
+    ez = max(sh.z - upper * .8, DESK_Z + .04 * scale ** 1.5)  # chibi sleeves are puffier
+    out = .04 * scale
+    elbow = sh + Vector((sign * out, -math.sqrt(max(0, upper ** 2 - (ez - sh.z) ** 2 - out ** 2)), ez - sh.z))
+    wx = sign * (.13 if 'chibi' in name else .115)  # hands a shoulder-width-ish apart on the keyboard, not crossing (big chibi thumbs would meet)
+    wy = elbow.y - math.sqrt(max(.01, fore ** 2 - (wz - ez) ** 2 - (wx - elbow.x) ** 2))
+    wrist = empty(f'{side} wrist', (wx, wy, wz))
+    elbows[side] = (ik(f'{side}ForeArm', wrist, empty(f'{side} elbow pole', (sign * .4, .1, sh.z - .1)), elbow), elbow)
     wrists[side] = wrist
-    # Palm down onto the keyboard: aim the hand along the forearm, flattened.
-    con = P[f'{side}Hand'].constraints.new('DAMPED_TRACK'); con.target = empty(f'{side} fingertips', wrist.location + Vector((-sign * .02, -.12, -.02)))
+    # The hand carries on along the forearm, knuckles raised a little: the heel of the palm rests on the
+    # laptop and the fingers arch down to the keys.
+    bpy.context.view_layer.update()
+    along = wrist.location - world(P[f'{side}ForeArm'].head); along.z = 0
+    along = along.normalized() + Vector((0, -1, 0)); along.normalize(); along.z = .3  # halfway to straight ahead
+    tips[side] = empty(f'{side} fingertips', wrist.location + along.normalized() * .12)
+    con = P[f'{side}Hand'].constraints.new('DAMPED_TRACK'); con.target = tips[side]
     con.track_axis = 'TRACK_Y'
 bpy.context.view_layer.update()
+
+
+def roll_palm(side, want):
+    """Roll a hand about its own length until its palm faces `want` (a world direction)."""
+    pb, rot = P[f'{side}Hand'], W().to_3x3().normalized()
+    def error():
+        bpy.context.view_layer.update()
+        length = (rot @ (pb.tail - pb.head)).normalized()
+        have = rot @ (pb.matrix.to_3x3() @ palm_rest[side]); have -= length * have.dot(length)
+        aim = want - length * want.dot(length)
+        return have.angle(aim, 0) * (1 if have.cross(aim).dot(length) > 0 else -1)
+    for _ in range(8):
+        angle = error()
+        if abs(angle) < .01: break
+        start = pb.rotation_quaternion.copy()
+        pb.rotation_quaternion = start @ Quaternion((0, 1, 0), angle)
+        if abs(error()) > abs(angle): pb.rotation_quaternion = start @ Quaternion((0, 1, 0), -angle)
+        # The forearm's twist bone takes the same roll, so the turn runs up the forearm and the cuff stays round.
+        q = pb.rotation_quaternion
+        P[f'{side}ForeArmTwist'].rotation_quaternion = Quaternion((0, 1, 0), 2 * math.atan2(q.y, q.w))
+
+
 
 # --- typing loop (8 s at 30 fps), keyed through the controls, then baked to plain bone keys ------------
 scene.render.fps = 30; scene.frame_start, scene.frame_end = 1, 241
 base = {b: P[b].rotation_quaternion.copy() for b in ('Spine', 'Spine01', 'Head')}
 axis = {b: P[b].matrix.to_quaternion().inverted() @ Vector((1, 0, 0)) for b in base}
 finger_axis = {s: P[f'{s}Fingers1'].matrix.to_quaternion().inverted() @ Vector((1, 0, 0)) for s in ('Left', 'Right')}
+SPLIT = {'Fingers1': 1, 'Fingers2': .8}  # how a finger's curl shares out between its two joints
+LIFT = .3                                # how far a typing finger lifts off its key
+RELAXED_CURL = .3                        # resting curl of the fingers on the keys
+curl_sign = {}
+
+
+def find_curl_sign(side):
+    """Rigs disagree on which way round the finger axis bends the fingers down (ask once the palm faces down)."""
+    tip_z = {}
+    for k in (1, -1):
+        P[f'{side}Fingers1'].rotation_quaternion = Quaternion(finger_axis[side], .4 * k); bpy.context.view_layer.update()
+        tip_z[k] = world(P[f'{side}Fingers2'].tail).z
+    curl_sign[side] = min(tip_z, key=tip_z.get)
+curl = lambda side, bone, amount: Quaternion(finger_axis[side], curl_sign[side] * amount * SPLIT[bone])
+# The laptop (build_furniture.py, scaled per cast): a 13 mm base whose keys stand 1.3 mm proud of it.
+PALM_REST_Z = DESK_Z + .013 * LAPTOP_SCALE
+KEYS_Z = PALM_REST_Z + .0013 * LAPTOP_SCALE
+
+
+def lowest(ids):
+    bpy.context.view_layer.update()
+    ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+    return min((mesh.matrix_world @ ev.vertices[i].co).z for i in ids)
+
+
+def group_ids(side, bones, weight):
+    groups = {mesh.vertex_groups[f'{side}{b}'].index for b in bones}
+    return [v.index for v in mesh.data.vertices if any(g.group in groups and g.weight > weight for g in v.groups)]
+
+
+# Rest each palm on the laptop, then curl the fingers until their tips just touch the keys. Typing lifts the
+# fingers off the keys and drops them back, so they never sink in, and the palm stays where it rests.
+rest = {}
+
+
+def rest_palm(side, palm):
+    """Roll the palm down and lower (or lift) the hand until its heel sits on the palm rest."""
+    roll_palm(side, Vector((0, 0, -1)))
+    for _ in range(6):
+        drop = lowest(palm) - (PALM_REST_Z + .001)
+        if abs(drop) < .0005: break
+        wrists[side].location.z -= drop; tips[side].location.z -= drop
+
+
+def forearm_sink(side, arm_ids):
+    """How far the arm dips below the desk top where it is over the desk (in front of the desk edge)."""
+    bpy.context.view_layer.update()
+    ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get()).data
+    edge_y = wrists[side].location.y + DESK_BACK
+    over = [p.z for p in (mesh.matrix_world @ ev.vertices[i].co for i in arm_ids) if p.y < edge_y]
+    return DESK_Z + .002 - min(over) if over else 0
+
+
+for side in ('Left', 'Right'):
+    palm, tips_ids = group_ids(side, ('Hand',), .6), group_ids(side, ('Fingers2',), .5)
+    arm_ids = group_ids(side, ('Arm', 'ForeArm'), .5)
+    con, want = elbows[side]
+    rest_palm(side, palm); find_curl_sign(side)
+
+    def touch():
+        """Rest the palm, then find the finger curl (radians) at which the fingertips meet the keys."""
+        rest_palm(side, palm)
+        lo, hi = -.6, 1.6
+        for _ in range(14):
+            mid = (lo + hi) / 2
+            for bone in SPLIT: P[side + bone].rotation_quaternion = curl(side, bone, mid)
+            lo, hi = (mid, hi) if lowest(tips_ids) > KEYS_Z + .0008 else (lo, mid)
+        return lo
+
+    def tilt():
+        """Hands differ (chibi fingers droop): tip the hand at the knuckles until a relaxed curl reaches the keys."""
+        lo, hi = -.08, .12
+        for _ in range(10):
+            mid = (lo + hi) / 2
+            tips[side].location.z = wrists[side].location.z + mid
+            lo, hi = (lo, mid) if touch() > RELAXED_CURL else (mid, hi)
+        tips[side].location.z = wrists[side].location.z + (lo + hi) / 2
+
+    # Palm on the laptop, forearm on the desk (not in it) and a relaxed curl: each change moves the others.
+    for _ in range(4):
+        tilt()
+        sink = forearm_sink(side, arm_ids)
+        if sink < .002: break
+        want = want + Vector((0, 0, sink * 1.3)); bend(con, P[f'{side}ForeArm'], want)
+    rest[side] = touch()
+    print('HAND', side, 'palm', round(lowest(palm), 4), 'finger curl', round(rest[side], 3),
+          'forearm sink', round(max(forearm_sink(side, arm_ids), 0), 4), flush=True)
 wrist_base = {s: o.location.copy() for s, o in wrists.items()}
 for frame in range(1, 242):
     t = (frame - 1) / 30
@@ -187,11 +362,11 @@ for frame in range(1, 242):
     for side, freq, phase in (('Left', 3, 0), ('Right', 3.5, 1.8)):
         burst = .35 + .65 * (.5 + .5 * math.cos(math.tau * t / 4))
         tap = max(0, math.sin(math.tau * freq * t + phase))
-        wrists[side].location = wrist_base[side] + Vector((0, 0, .004 * tap * burst))
+        wrists[side].location = wrist_base[side]  # the palm stays on the laptop
         wrists[side].keyframe_insert('location', frame=frame)
-        for bone, amp in ((f'{side}Fingers1', .35), (f'{side}Fingers2', .25)):
-            P[bone].rotation_quaternion = Quaternion(finger_axis[side], -(.15 + amp * tap * burst))
-            P[bone].keyframe_insert('rotation_quaternion', frame=frame, group=bone)
+        for bone in SPLIT:
+            P[side + bone].rotation_quaternion = curl(side, bone, rest[side] - LIFT * tap * burst)
+            P[side + bone].keyframe_insert('rotation_quaternion', frame=frame, group=side + bone)
 scene.frame_set(1)
 bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True); bpy.context.view_layer.objects.active = arm
 bpy.ops.nla.bake(frame_start=1, frame_end=241, only_selected=False, visual_keying=True, clear_constraints=True, use_current_action=False,
@@ -232,7 +407,7 @@ def key(frame, bones):
 
 
 hand, fingers = f'{wave_side}Hand', [f'{wave_side}Fingers1', f'{wave_side}Fingers2']
-arm_bones = [f'{wave_side}Arm', f'{wave_side}ForeArm', hand, 'Head', 'neck'] + ([] if chibi else fingers)
+arm_bones = [f'{wave_side}Arm', f'{wave_side}ForeArm', hand, 'Head', 'neck'] + fingers
 scene.frame_set(1); key(1, arm_bones)
 start = {b: P[b].rotation_quaternion.copy() for b in arm_bones}  # the typing pose
 palm = P[hand].matrix.to_3x3().inverted() @ Vector((0, 0, -1))  # palm normal in the hand's frame (down while typing)
@@ -252,25 +427,17 @@ def palm_to_camera():
     rotate_world(hand, length, angle)
 
 
-# Chibi: the short arms cannot lift the hand clear of the big head, so the far hand rises up and out to
-# the open side of the frame. Classic: a small, friendly wave with the near hand, the elbow out and a little
-# low and the hand at about shoulder height, rocking across the camera's view with the palm towards it.
-swings = ((12, 0), (22, 1), (32, -1), (42, 1), (52, -1), (62, 0)) if chibi else \
-    ((12, 0), (19, 1), (26, -1), (33, 1), (40, -1), (47, 1), (54, -1), (62, 0))
-for frame, swing in swings:
+# A small, friendly wave with the near hand: the elbow out and a little low and the hand at about shoulder
+# height, rocking across the camera's view with the palm open towards it.
+for frame, swing in ((12, 0), (19, 1), (26, -1), (33, 1), (40, -1), (47, 1), (54, -1), (62, 0)):
     for b in arm_bones: P[b].rotation_quaternion = start[b]
     bpy.context.view_layer.update()
-    if chibi:
-        aim(f'{wave_side}Arm', Vector((sign * .6, -.45, .65)).normalized())
-        aim(f'{wave_side}ForeArm', Vector((sign * (.45 + .2 * swing), -.45 - .2 * swing, 1)).normalized())
-        aim(hand, Vector((sign * (.5 + .3 * swing), -.5 - .3 * swing, 1)).normalized())
-    else:
-        aim(f'{wave_side}Arm', Vector((sign * .8, -.2, -.45)).normalized())
-        rock = swing + .4 * toward  # leans away from the face on screen, so the hand never covers it
-        aim(f'{wave_side}ForeArm', (Vector((sign * .4, -.12, 1)) + across * .25 * rock).normalized())
-        aim(hand, (Vector((sign * .35, -.1, 1)) + across * .45 * rock).normalized())
-        palm_to_camera()
-        for b in fingers: P[b].rotation_quaternion = Quaternion()  # open hand
+    aim(f'{wave_side}Arm', Vector((sign * .8, -.2, -.45)).normalized())
+    rock = swing + .4 * toward  # leans away from the face on screen, so the hand never covers it
+    aim(f'{wave_side}ForeArm', (Vector((sign * .4, -.12, 1)) + across * .25 * rock).normalized())
+    aim(hand, (Vector((sign * .35, -.1, 1)) + across * .45 * rock).normalized())
+    palm_to_camera()
+    for b in fingers: P[b].rotation_quaternion = Quaternion()  # open hand
     rotate_world('Head', (0, 0, 1), math.radians(32 * toward))  # turn towards the camera
     rotate_world('neck', (0, 0, 1), math.radians(12 * toward))
     rotate_world('Head', (1, 0, 0), math.radians(8))  # lift the chin off the laptop
@@ -289,7 +456,8 @@ scene.frame_set(1); bpy.context.view_layer.update()
 out = ROOT / 'generated'; out.mkdir(exist_ok=True)
 wrist_mid = (wrist_base['Left'] + wrist_base['Right']) / 2
 meta = {'name': name, 'seat': seat, 'scale': scale, 'height_m': height * 1, 'hip_z': HIP_Z,
-        'wrist_mid': list(wrist_mid), 'rigid_vertices': len(rigid), 'wave_hand': wave_side}
+        'wrist_mid': list(wrist_mid), 'rigid_vertices': len(rigid), 'wave_hand': wave_side, 'laptop_scale': LAPTOP_SCALE,
+        'laptop_inset': LAPTOP_INSET}
 (out / f'{name}-seated.json').write_text(json.dumps(meta, indent=2))
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / f'{name}-seated.blend'))
 bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True); mesh.select_set(True)

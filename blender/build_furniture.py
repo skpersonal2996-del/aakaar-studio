@@ -8,9 +8,9 @@ Design references: output/meshy-reference-assets-2026-10-31/design-references/ a
 python3 blender/fetch_polyhaven_textures.py
 blender --background --factory-startup --python-exit-code 1 --python blender/build_furniture.py
 """
-import bpy, math
+import bpy, bmesh, math
 from pathlib import Path
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 ROOT = Path(__file__).resolve().parent
 TEX = ROOT / 'source/polyhaven/textures'
@@ -76,6 +76,9 @@ def picture(name, file):
 
 
 WALNUT = pbr('Walnut', 'black_walnut_veneer_02', .9, tint=(.95, .8, .68), rough=.75)
+DESK_WALNUT = pbr('Glossy walnut', 'black_walnut_veneer_02', 1.2, tint=(.45, .28, .2), rough=.25, bump=.3)
+DESK_WALNUT.node_tree.nodes['Principled BSDF'].inputs['Coat Weight'].default_value = 1  # lacquered, as on the board
+DESK_WALNUT.node_tree.nodes['Principled BSDF'].inputs['Coat Roughness'].default_value = .06
 BLACK_OAK = pbr('Black oak', 'black_oak_veneer', .9, tint=(.16, .15, .14), rough=.8, bump=.6)
 JUTE = pbr('Jute', 'hessian_230', 1.1, tint=(.85, .62, .4), rough=1.0, bump=4.0)  # chunky 7 mm cords
 FLOOR_OAK = pbr('Oak floor', 'oak_wood_planks', 2.0, tint=(.36, .22, .13), rough=.6)  # deep warm brown, as in the reference
@@ -84,6 +87,12 @@ STEEL = flat('Black steel', (.018, .018, .018), rough=.42, metal=.65)
 BRASS = flat('Brushed brass', (.78, .55, .28), rough=.32, metal=1.0)
 SHADE = flat('Cream shade', (.93, .87, .76), rough=.45)
 BULB = glow('Lamp glow', (1, .78, .5), 12)
+ALUMINIUM = flat('Aluminium', (.78, .79, .81), rough=.35, metal=.9)
+KEY_WELL = flat('Keyboard well', (.012, .012, .014), rough=.6)
+KEYCAP = flat('Keycap', (.03, .03, .033), rough=.5)
+TRACKPAD = flat('Trackpad', (.66, .67, .69), rough=.3, metal=.8)
+BEZEL = flat('Screen bezel', (.01, .01, .012), rough=.2)
+SCREEN = glow('Screen glow', (.62, .68, .8), 1.5)
 OAK_FRAME = pbr('Oak frame', 'black_walnut_veneer_02', .4, tint=(1.1, .95, .8), rough=.7)
 
 # --- geometry helpers ------------------------------------------------------------------------
@@ -126,10 +135,10 @@ def finish(root):
 
 
 def desk(x, w=2.7, d=1.35, h=.765):
-    """Walnut top on a black square-tube frame (03-wood-and-black-metal-desk)."""
+    """Lacquered walnut top on a black square-tube frame (03-wood-and-black-metal-desk)."""
     r = piece('Desk · walnut and steel', x)
     t, leg = .045, .05
-    box('Top', (w, d, t), (x, 0, h - t / 2), WALNUT, r, .004)
+    box('Top', (w, d, t), (x, 0, h - t / 2), DESK_WALNUT, r, .004)
     lx, ly = w / 2 - .6, d / 2 - .09  # trestles well in from the ends, clear of the seated people's feet
     for sx in (-1, 1):
         for sy in (-1, 1): box('Leg', (leg, leg, h - t), (x + sx * lx, sy * ly, (h - t) / 2), STEEL, r, .002)
@@ -171,9 +180,9 @@ def shelf_unit(x, w, d, h, shelves, name, levels=None):
     finish(r); return r
 
 
-def pendant(x, drop=1.2):
+def pendant(x, drop=1.2, name='Pendant · black drum'):
     """Black drum pendant with a glowing diffuser (10-black-cylinder-pendant-lamp). Origin = ceiling."""
-    r = piece('Pendant · black drum', x)
+    r = piece(name, x)
     top = 0.0  # hangs below its origin; place the origin on the ceiling
     cyl('Canopy', .055, .025, (x, 0, top - .0125), STEEL, r, bevel=.003)
     cyl('Cord', .003, drop, (x, 0, top - .025 - drop / 2), STEEL, r, verts=8, bevel=0)
@@ -239,6 +248,40 @@ def framed(x, name, size, mat, frame_mat, frame=.035, depth=.03):
     finish(r); return r
 
 
+def laptop(x, w=.31, d=.22, t=.013, lid_h=.205, open_deg=105):
+    """Clean aluminium laptop (20-laptop): base, dark key grid, trackpad and an open lid with a lit screen.
+    The user's side is -Y and the root sits at the middle of the base's underside, like the Meshy model it replaces."""
+    r = piece('Laptop · aluminium', x)
+    box('Base', (w, d, t), (x, 0, t / 2), ALUMINIUM, r, .004)
+    kb_y, kb_d = d / 2 - .012 - .05, .1  # keyboard well towards the hinge, trackpad in front
+    box('Keyboard well', (w - .038, kb_d, .0006), (x, kb_y, t + .0001), KEY_WELL, r, 0)
+    me = bpy.data.meshes.new('Keys'); bm = bmesh.new()
+    pitch, cap = .0166, .0142
+    rows = [[1] * 16, [1] * 15, [1] * 15, [1] * 15, [1.2, 1, 1, 1.2, 5.6, 1.2, 1, 1, 1]]  # front row: modifiers and space
+    for ri, row in enumerate(rows):
+        yy = kb_y + kb_d / 2 - .009 - ri * pitch * (.75 if ri == 0 else 1) - (pitch * .25 if ri else 0)
+        width = sum(row) * pitch; xx = x - width / 2
+        depth = cap * (.55 if ri == 0 else 1)  # short function row
+        for k in row:
+            geom = bmesh.ops.create_cube(bm, size=1)['verts']
+            bmesh.ops.scale(bm, vec=(k * pitch - (pitch - cap), depth, .0012), verts=geom)
+            bmesh.ops.translate(bm, vec=(xx + k * pitch / 2, yy, t + .0007), verts=geom)
+            xx += k * pitch
+    bm.to_mesh(me); bm.free(); me.materials.append(KEYCAP)
+    keys = bpy.data.objects.new('Keys', me); bpy.context.collection.objects.link(keys); keys.parent = r
+    box('Trackpad', (.11, .066, .0004), (x, -d / 2 + .012 + .033, t + .0001), TRACKPAD, r, 0)
+    # Lid, hinged at the back edge and leaning back.
+    tilt = Matrix.Rotation(math.radians(open_deg - 90), 4, 'X').inverted()  # top of the lid leans away from the user
+    hinge = Vector((x, d / 2 - .003, t))
+    lid = box('Lid', (w, .005, lid_h), (0, 0, 0), ALUMINIUM, r, .003)
+    bezel = box('Screen bezel', (w - .008, .0004, lid_h - .008), (0, 0, 0), BEZEL, r, 0)
+    screen = box('Screen', (w - .03, .0004, lid_h - .03), (0, 0, 0), SCREEN, r, 0)
+    for o, off in ((lid, Vector((0, .0025, lid_h / 2))), (bezel, Vector((0, -.0003, lid_h / 2))),
+                   (screen, Vector((0, -.0006, lid_h / 2 + .004)))):
+        o.matrix_basis = Matrix.Translation(hinge) @ tilt @ Matrix.Translation(off)  # like box(): finish() re-parents
+    finish(r); return r
+
+
 # Layout for the preview, left to right.
 desk(0)
 cabinet(3.0, h=.71)  # ID-wall cabinet: top at the old 0.71 m, where its lamp and books sit
@@ -248,7 +291,9 @@ shelf_unit(9.0, .6, .35, 2.2, 6, 'Shelf · tall divider')
 # Replaces the room's open shelf; shelf tops match the props already standing on it.
 shelf_unit(19.0, .9, .34, 2.25, 5, 'Open shelf · walnut', levels=[.1, .62, 1.13, 1.65, 2.17])
 p = pendant(10.0, drop=1.45); p.location.z = 2.9  # drum about 1.9 m above the floor under a 3.6 m ceiling
+p = pendant(10.4, drop=1.95, name='Pendant · black drum · long'); p.location.z = 3.4  # the same under a 4.2 m ceiling
 floor_lamp(10.9)
+laptop(11.8)
 rug(13.0)
 framed(15.3, 'Wall art · framed', (.95, 1.25), picture('Wall art', 'wall-art.png'), STEEL)
 framed(16.6, 'Poster · framed', (.6, .83), picture('Poster', 'poster.png'), OAK_FRAME)

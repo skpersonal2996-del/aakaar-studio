@@ -5,9 +5,11 @@ import {MeshoptEncoder, MeshoptDecoder} from 'meshoptimizer'
 import sharp from 'sharp'
 import {mkdir,stat,writeFile} from 'node:fs/promises'
 import {fileURLToPath} from 'node:url'
-// Packages the Blender bake (blender/bake_cozy_room.py) for the website.
+// Packages the Blender bake (blender/bake_cozy_room.py) for the website: the cozy room into public/studio/,
+// another room (`npm run assets:room -- spacious-dark`) into public/studio/<room>/ beside it.
 const root=fileURLToPath(new URL('../',import.meta.url))
-const source=`${root}blender/generated/room-bake/`,target=`${root}public/studio/`
+const room=process.argv[2]
+const source=`${root}blender/generated/room-bake${room?`-${room}`:''}/`,target=`${root}public/studio/${room?`${room}/`:''}`
 await Promise.all([MeshoptEncoder.ready,MeshoptDecoder.ready])
 const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.encoder':MeshoptEncoder,'meshopt.decoder':MeshoptDecoder})
 await mkdir(target,{recursive:true})
