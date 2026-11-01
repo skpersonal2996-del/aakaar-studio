@@ -166,6 +166,75 @@ rigid = sorted(rigid)
 for g in mesh.vertex_groups: g.remove(rigid)
 mesh.vertex_groups['Head'].add(rigid, 1, 'REPLACE')
 
+# --- torso weights and shape: the sweater follows the spine, not the arms -----------------------------
+# Meshy's automatic rig hands most of the torso between the hips and the armpits to the upper-arm bones (about
+# 70 % of those vertices), so reaching forward to type dragged the lats and sides of the sweater outwards: seated,
+# the torso came out 30-60 % wider than at rest. The torso is re-weighted to the spine chain by height, fading back
+# to Meshy's weights near the armpits and hips so those joints still bend. The new weights depend on rest
+# position only, so the copies of a vertex at a UV seam stay together (re-weighting by mesh edges tore the seams).
+smoothstep = lambda a, b, x: (lambda t: t * t * (3 - 2 * t))(np.clip((x - a) / (b - a), 0, 1))
+M = np.array(mesh.matrix_world)
+pos = (np.c_[coords, np.ones(len(coords))] @ M.T)[:, :3]
+hips_w = world(D['Hips'].head_local)
+armpit_z = (world(D['LeftArm'].head_local).z + world(D['RightArm'].head_local).z) / 2
+inner = min(abs(world(D[f'{s}Arm'].head_local).x - hips_w.x) for s in ('Left', 'Right'))
+r = np.abs(pos[:, 0] - hips_w.x) / inner                  # 0 on the spine, 1 under the shoulder joint
+t = (pos[:, 2] - hips_w.z) / (armpit_z - hips_w.z)       # 0 at the hips, 1 at the armpits
+mix = (1 - smoothstep(.8, 1.0, r)) * smoothstep(-.05, .12, t) * (1 - smoothstep(.88, 1.02, t))
+mix[rigid] = 0                                            # face and long hair stay with the head
+chain = [n for n in ('Hips', 'Spine02', 'Spine01', 'Spine') if n in mesh.vertex_groups]
+heights = np.array([world(D[n].head_local).z for n in chain])
+moved = np.flatnonzero(mix > 1e-3)
+for i in moved.tolist():
+    v = mesh.data.vertices[i]; m = float(mix[i])
+    old = {g.group: g.weight for g in v.groups}
+    total = sum(old.values()) or 1.0
+    k = int(np.clip(np.searchsorted(heights, pos[i, 2]) - 1, 0, len(chain) - 2))
+    f = float(np.clip((pos[i, 2] - heights[k]) / max(heights[k + 1] - heights[k], 1e-6), 0, 1))
+    new = {gi: w / total * (1 - m) for gi, w in old.items()}
+    for n, w in ((chain[k], 1 - f), (chain[k + 1], f)):
+        gi = mesh.vertex_groups[n].index; new[gi] = new.get(gi, 0) + m * w
+    for gi in set(old) | set(new):
+        g = mesh.vertex_groups[gi]
+        if new.get(gi, 0) > 1e-4: g.add([i], new[gi], 'REPLACE')
+        else: g.remove([i])
+# Meshy cut the sweater boxy, nearly as wide as the shoulders: taper the waist and lats in towards the spine (the
+# same smooth region, so seam copies move together).
+TAPER = .2
+taper = TAPER * mix * smoothstep(.05, .35, t) * (1 - smoothstep(.75, 1.0, t))
+pos[:, 0] = hips_w.x + (pos[:, 0] - hips_w.x) * (1 - taper)
+coords = (np.c_[pos, np.ones(len(pos))] @ np.linalg.inv(M).T)[:, :3]
+mesh.data.vertices.foreach_set('co', coords.ravel()); mesh.data.update()
+print('TORSO re-weighted', len(moved), 'vertices; tapered up to', TAPER, flush=True)
+
+# --- slimmer sleeves ---------------------------------------------------------------------------------
+# Meshy's oversized sweaters make the sleeves wide tubes that read as puffy next to the small hands. Each sleeve
+# vertex moves part of the way to its arm bone, by how strongly it belongs to that bone, so the slimming fades out
+# into the shoulder and the cuff on its own and the copies of a vertex at a UV seam (same position and weights)
+# stay together. Hands, the face and long hair are left alone.
+SLIM = {'Arm': .18, 'ForeArm': .1, 'ForeArmTwist': .1}
+seg = {}
+for side in ('Left', 'Right'):
+    seg[f'{side}Arm'] = (world(D[f'{side}Arm'].head_local), world(D[f'{side}ForeArm'].head_local))
+    seg[f'{side}ForeArm'] = (world(D[f'{side}ForeArm'].head_local), world(D[f'{side}Hand'].head_local))
+    seg[f'{side}ForeArmTwist'] = seg[f'{side}ForeArm']
+group_name = {g.index: g.name for g in mesh.vertex_groups}
+rigid_set = set(rigid)
+shift = np.zeros_like(pos)
+for v in mesh.data.vertices:
+    if v.index in rigid_set: continue
+    p = Vector(pos[v.index])
+    for g in v.groups:
+        n = group_name[g.group]
+        if n not in seg or g.weight < 1e-3: continue
+        a, b = seg[n]; ab = b - a
+        closest = a + ab * min(max((p - a).dot(ab) / ab.length_squared, 0), 1)
+        shift[v.index] += np.array(closest - p) * g.weight * SLIM[n.replace('Left', '').replace('Right', '')]
+pos += shift
+coords = (np.c_[pos, np.ones(len(pos))] @ np.linalg.inv(M).T)[:, :3]
+mesh.data.vertices.foreach_set('co', coords.ravel()); mesh.data.update()
+print('SLEEVES slimmed', int((np.abs(shift).sum(1) > 1e-5).sum()), 'vertices', flush=True)
+
 # --- seated pose with IK -------------------------------------------------------------------------
 for pb in P: pb.rotation_mode = 'QUATERNION'; pb.matrix_basis = Matrix.Identity(4)
 bpy.context.view_layer.update()
@@ -220,7 +289,7 @@ for side, sign in (('Left', 1), ('Right', -1)):
     # so the forearm never climbs to the keyboard from below the desk.
     sh = shoulder[side]; wz = DESK_Z + .04
     # Elbow a little forward of the body, but never below the desk top: the forearms rest on the desk.
-    ez = max(sh.z - upper * .8, DESK_Z + .04 * scale ** 1.5)  # chibi sleeves are puffier
+    ez = max(sh.z - upper * .92, DESK_Z + .04 * scale ** 1.5)  # chibi sleeves are puffier
     out = .04 * scale
     elbow = sh + Vector((sign * out, -math.sqrt(max(0, upper ** 2 - (ez - sh.z) ** 2 - out ** 2)), ez - sh.z))
     wx = sign * (.13 if 'chibi' in name else .115)  # hands a shoulder-width-ish apart on the keyboard, not crossing (big chibi thumbs would meet)
@@ -447,6 +516,26 @@ for b in arm_bones:  # settle back into the typing pose
     for fc in curves(wave):
         if fc.data_path == f'pose.bones["{b}"].rotation_quaternion':
             fc.keyframe_points.insert(78, fc.keyframe_points[0].co[1])
+
+# --- armpit slivers -----------------------------------------------------------------------------------
+# Meshy's meshes carry thin flaps at the armpits (folds and hair ends tucked between arm and body). Hidden at rest,
+# the typing pose stretches them into dark shards cutting out of the sweater. Faces near shoulder height that the
+# pose stretches to more than six times their rest area are those flaps (real sweater faces stretch two or three
+# times at most), so they are deleted.
+import bmesh
+scene.frame_set(1); bpy.context.view_layer.update()
+ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+posed = np.array([tuple(v.co) for v in ev.data.vertices]); rest = np.array([tuple(v.co) for v in mesh.data.vertices])
+tris = np.array([pl.vertices[:3] for pl in mesh.data.polygons])
+area = lambda P: np.linalg.norm(np.cross(P[tris[:, 1]] - P[tris[:, 0]], P[tris[:, 2]] - P[tris[:, 0]]), axis=1)
+stretch = area(posed) / np.maximum(area(rest), 1e-12)
+shoulder_mz = (mesh.matrix_world.inverted() @ world(D['LeftArm'].head_local)).z
+near = np.abs(rest[tris].mean(1)[:, 2] - shoulder_mz) < .15 * local
+slivers = np.flatnonzero((stretch > 6) & near)
+bm = bmesh.new(); bm.from_mesh(mesh.data); bm.faces.ensure_lookup_table()
+bmesh.ops.delete(bm, geom=[bm.faces[i] for i in slivers.tolist()], context='FACES_ONLY')
+bm.to_mesh(mesh.data); bm.free(); mesh.data.update()
+print('SLIVERS removed', len(slivers), 'armpit faces', flush=True)
 
 # --- export -------------------------------------------------------------------------------------
 arm.animation_data.action = typing

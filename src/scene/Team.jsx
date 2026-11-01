@@ -25,10 +25,52 @@ const HEAD_TILT = { chibi: 0.3, classic: 0.25 }
 const TILT_SHARE = [['neck', 0.3], ['Head', 0.7]]
 const UP = new THREE.Vector3(0, 1, 0)
 const bone = (track) => track.name.split('.')[0]
+
+// Clothes read as fabric: a faint, broad cloth sheen on the clothing only (a stronger sheen, or a procedural weave,
+// made the sleeves and the sides of the torso look padded). The clothing is told apart from skin (bright warm
+// peach) and hair (dark warm brown) by the base colour itself, so no mask textures are needed.
+const CLOTH_MASK = `
+  vec3 srgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+  float hi = max(srgb.r, max(srgb.g, srgb.b)), lo = min(srgb.r, min(srgb.g, srgb.b));
+  float sat = (hi - lo) / max(hi, 1e-4);
+  float warmHue = step(srgb.g, srgb.r) * step(srgb.b, srgb.g) * (1.0 - smoothstep(0.55, 0.75, (srgb.g - srgb.b) / max(hi - lo, 1e-4)));
+  float skin = warmHue * smoothstep(0.2, 0.28, sat) * (1.0 - smoothstep(0.7, 0.8, sat)) * smoothstep(0.65, 0.8, hi);
+  float hair = step(srgb.b, srgb.r) * smoothstep(0.18, 0.26, sat) * (1.0 - smoothstep(0.3, 0.4, hi));
+  hair = max(hair, step(neckHeight, vBindHeight)); // the whole head and hair: no cloth sheen
+  float clothMask = clamp(1.0 - max(skin, hair), 0.0, 1.0);
+`
+function fabricMaterial(old, neckHeight) {
+  // Matte clay skin and knitwear, as in the reference renders. Meshy's roughness maps are glossy (about 0.6) and the
+  // factor only scales them, so the map goes (metalness shares it and is zero anyway). Its normal map adds little
+  // beyond ridges along every UV seam, which the live lights turned into bright scratches, so it goes too.
+  const material = new THREE.MeshPhysicalMaterial({
+    map: old.map, color: old.color,
+    roughness: 0.85, metalness: 0, sheen: 1, sheenRoughness: 0.85, sheenColor: new THREE.Color(0.12, 0.11, 0.105),
+  })
+  if (material.map) {
+    // Meshy packs differently coloured patches edge to edge, so the smaller mip levels blend skin into hair along
+    // every seam (light lines in the dark hair). Sample the full texture only; anisotropy keeps it from shimmering.
+    material.map.generateMipmaps = false
+    material.map.minFilter = THREE.LinearFilter
+    material.map.anisotropy = 8
+    material.map.needsUpdate = true
+  }
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.neckHeight = { value: neckHeight }
+    shader.vertexShader = 'varying float vBindHeight;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBindHeight = position.y;')
+    shader.fragmentShader = 'varying float vBindHeight;\nuniform float neckHeight;\n' + shader.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\n' + CLOTH_MASK)
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  material.sheenColor *= clothMask;')
+  }
+  material.customProgramCacheKey = () => 'fabric'
+  material.userData.fabric = true
+  return material
+}
 const only = (clip, keep, name) => new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => keep(bone(t))))
 
 // A seated character from the Meshy rigs: an eight-second typing loop, and a short wave on hover.
-function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props }) {
+function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, neck = 0.82, ...props }) {
   const { scene, animations } = useGLTF(model, false, true)
   const actor = useMemo(() => clone(scene), [scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
@@ -49,12 +91,11 @@ function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props 
       if (!o.isMesh) return
       o.castShadow = o.receiveShadow = true
       o.frustumCulled = false // a bind-pose bounding box cannot represent a seated skinned character
-      // Matte clay skin and knitwear, as in the reference renders. Meshy's roughness maps are glossy (about 0.6) and
-      // the factor only scales them, so the map goes; the normal map is softened so the knit folds don't catch the
-      // live lights as white streaks. Metalness shares that texture and is zero anyway.
-      Object.assign(o.material, { roughnessMap: null, metalnessMap: null, roughness: 0.85, metalness: 0 })
-      if (o.material.normalMap) o.material.normalScale.setScalar(0.6)
-      o.material.needsUpdate = true
+      if (!o.material.userData.fabric) {
+        o.geometry.computeBoundingBox()
+        const { min, max } = o.geometry.boundingBox // the bind pose, standing (glTF is y-up)
+        o.material = fabricMaterial(o.material, min.y + (max.y - min.y) * neck)
+      }
     })
     const clip = (name) => animations.find((a) => a.name === name)
     const typing = clip('TypingIdle')
@@ -142,7 +183,7 @@ function Seat({ who, cast, intro, phase }) {
   const s = SEATS[cast][who]
   return (
     <>
-      <SeatedPerson model={url(MODELS[cast][who])} intro={intro} peekId={who} phase={phase} headTilt={HEAD_TILT[cast]}
+      <SeatedPerson model={url(MODELS[cast][who])} intro={intro} peekId={who} phase={phase} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
         position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
       <Prop src={PROP.laptop} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />

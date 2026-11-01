@@ -1,8 +1,9 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { Html, useCursor, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store'
+import { night, roomLight } from './BakedRoom'
 
 // The studio cat: Meshy's Puszek (CC0, by MrDavKot) with its quadruped walk, prepared by
 // blender/prepare_cat.py. It strolls a loop around the desk — up the bookshelf side, past the arc lamp and the
@@ -18,6 +19,71 @@ const PATH = new THREE.CatmullRomCurve3(
 )
 const LOOP = PATH.getLength()
 const START = 0.502 // back right by the corner plant: it walks down the window side, then across the front
+
+// The room is lit by its baked lightmaps, the cat only by the few live lights meant for the characters, so it looked
+// cool and flat against the warm floor. Instead it takes the baked light of the floor under its paws, read once
+// along its path from both lightmaps (warm and night), exactly as the room surfaces are lit; a little of the live
+// light is kept for its form, and a soft contact shadow sits under it. Only the brightness and a hint of the light's
+// colour are taken, so the cat keeps its own grey and white fur.
+const SAMPLES = 240
+const FORM = 0.3 // share of the live lights, for shading across the body
+const TINT = 0.25 // how much of the floor light's colour reaches the fur: the floor's own orange bounce would recolour the cat
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+function pixels(texture, size = 512) {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(texture.image, 0, 0, size, size)
+  return { data: ctx.getImageData(0, 0, size, size).data, size }
+}
+function floorLight() {
+  const maps = [pixels(roomLight.warm), pixels(roomLight.night)]
+  const ray = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 1)
+  const meshes = roomLight.meshes.map((m) => m.mesh)
+  const channel = new Map(roomLight.meshes.map((m) => [m.mesh, m.channel]))
+  let last = [new THREE.Color(0.4, 0.3, 0.25), new THREE.Color(0.2, 0.15, 0.2)]
+  return Array.from({ length: SAMPLES }, (_, i) => {
+    const p = PATH.getPointAt(i / SAMPLES)
+    ray.ray.origin.set(p.x, 0.5, p.z)
+    const hit = ray.intersectObjects(meshes, false)[0]
+    const uv = hit && (channel.get(hit.object) ? hit.uv1 : hit.uv)
+    if (uv) {
+      last = maps.map(({ data, size }, k) => {
+        const x = Math.min(size - 1, Math.max(0, Math.floor(uv.x * size)))
+        const y = Math.min(size - 1, Math.max(0, Math.floor(uv.y * size)))
+        const j = (y * size + x) * 4, k2 = roomLight.scales[k] * roomLight.exposure
+        return new THREE.Color(toLinear(data[j] / 255) * k2, toLinear(data[j + 1] / 255) * k2, toLinear(data[j + 2] / 255) * k2)
+      })
+    }
+    return last
+  })
+}
+
+// Clicked, the cat stops, turns towards the visitor, looks up at the camera with her tail wagging and says meow,
+// then walks on. The walk clip is her only animation, so the reaction is layered on top.
+const REACT = 2.8 // seconds
+const UP = new THREE.Vector3(0, 1, 0)
+const ease = (x) => x * x * (3 - 2 * x)
+const angle = (a) => Math.atan2(Math.sin(a), Math.cos(a)) // wrapped to -π..π
+function turnBone(bone, q, parent) {
+  // a rotation about a world axis, as a change of the bone's local rotation: local' = parent⁻¹ · q · parent · local
+  bone.parent.getWorldQuaternion(parent)
+  bone.quaternion.premultiply(parent.clone().invert().multiply(q).multiply(parent))
+}
+
+// A soft dark disc under the cat, so its paws meet the floor.
+function shadowTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+  g.addColorStop(0, 'rgba(0,0,0,0.55)')
+  g.addColorStop(0.6, 'rgba(0,0,0,0.25)')
+  g.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(canvas)
+}
 
 export function Cat() {
   const { scene, animations } = useGLTF(url, false, true)
@@ -43,40 +109,108 @@ export function Cat() {
     return { scale, lift: -box.min.y * scale }
   }, [scene])
 
+  const light = useRef(null)
+  const materials = useRef([])
+  const shadow = useMemo(() => shadowTexture(), [])
+  const tmp = useMemo(() => [new THREE.Color(), new THREE.Color()], [])
+  const react = useRef({ t: REACT })
+  const [hover, setHover] = useState(false)
+  const [meow, setMeow] = useState(false)
+  const active = useStore((s) => s.active)
+  useCursor(hover && !active)
+  const bones = useMemo(() => {
+    const find = (name) => { let b = null; scene.traverse((o) => { if (o.isBone && o.name === name) b = o }); return b }
+    return { head: find('head'), tail: ['tailstart', 'tail1', 'tail2', 'tail3'].map(find).filter(Boolean) }
+  }, [scene])
+  const q = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion() }), [])
+
   useLayoutEffect(() => {
+    materials.current = []
     scene.traverse((o) => {
       if (!o.isMesh) return
-      o.castShadow = o.receiveShadow = true
+      o.castShadow = true
       o.frustumCulled = false // the bind-pose box does not follow the walk
-      o.material.roughness = Math.max(o.material.roughness, 0.8) // soft fur, no plastic sheen
+      // Fur takes the floor's baked light as emission (the room's own shading) plus a little live light for form.
+      o.material = new THREE.MeshLambertMaterial({ map: o.material.map, emissiveMap: o.material.map })
+      materials.current.push(o.material)
     })
     mixer.clipAction(animations[0]).play()
     return () => mixer.stopAllAction()
   }, [scene, animations, mixer])
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     const dt = Math.min(delta, 0.1)
     const w = walk.current
+    const r = react.current
+    const reacting = r.t < REACT
+    if (reacting) r.t += dt
     if (entered) w.next -= dt
     if (w.rest > 0) w.rest -= dt
     else if (w.next <= 0) {
       w.rest = 2.5 + Math.random() * 3
       w.next = 12 + Math.random() * 14
     }
-    const target = !entered || reduced.matches || w.rest > 0 ? 0 : 1 // waits at its start until the visitor steps in
+    const target = !entered || reduced.matches || w.rest > 0 || reacting ? 0 : 1 // waits at its start until the visitor steps in
     w.pace += (target - w.pace) * (1 - Math.exp(-dt * 4))
     mixer.timeScale = w.pace
     mixer.update(dt)
     w.at = (w.at + (SPEED * w.pace * dt) / LOOP) % 1
     const p = PATH.getPointAt(w.at)
     const t = PATH.getTangentAt(w.at)
+    if (!light.current && roomLight.meshes.length && roomLight.warm?.image) light.current = floorLight()
+    if (light.current) {
+      const f = w.at * SAMPLES, i = Math.floor(f) % SAMPLES, j = (i + 1) % SAMPLES, u = f - Math.floor(f)
+      const [warm, nite] = tmp
+      warm.lerpColors(light.current[i][0], light.current[j][0], u)
+      nite.lerpColors(light.current[i][1], light.current[j][1], u)
+      warm.lerp(nite, night.value)
+      const level = warm.r * 0.2126 + warm.g * 0.7152 + warm.b * 0.0722
+      nite.setScalar(level).lerp(warm.multiplyScalar(level / Math.max(warm.r, warm.g, warm.b, 1e-4) * 1.3), TINT)
+      warm.copy(nite)
+      for (const m of materials.current) {
+        m.emissive.copy(warm).multiplyScalar(1 - FORM)
+        m.color.copy(warm).multiplyScalar(FORM * 2)
+      }
+    }
+    const heading = Math.atan2(t.x, t.z)
+    let yaw = heading
+    if (reacting && !reduced.matches) {
+      const k = ease(Math.min(r.t / 0.35, 1)) * ease(Math.min((REACT - r.t) / 0.5, 1)) // in and out
+      const toCamera = angle(Math.atan2(camera.position.x - p.x, camera.position.z - p.z) - heading)
+      yaw = heading + toCamera * 0.55 * k                 // the body turns part of the way...
+      const look = THREE.MathUtils.clamp(toCamera * 0.45, -0.9, 0.9) * k // ...the head the rest
+      ref.current.updateMatrixWorld(true)
+      if (bones.head) turnBone(bones.head, q.q.setFromAxisAngle(UP, look), q.p)
+      bones.tail.forEach((b, i) => turnBone(b, q.q.setFromAxisAngle(UP, Math.sin(r.t * 11 - i * 0.7) * 0.28 * k), q.p))
+    }
+    const talking = reacting && r.t > 0.4 && r.t < REACT - 0.5
+    if (talking !== meow) setMeow(talking)
     ref.current.position.set(p.x, fit.lift, p.z)
-    ref.current.rotation.y = Math.atan2(t.x, t.z)
+    ref.current.rotation.y = yaw
   })
 
   return (
-    <group ref={ref}>
+    <group ref={ref}
+      onPointerOver={(e) => { e.stopPropagation(); setHover(true) }}
+      onPointerOut={() => setHover(false)}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (!active && e.delta <= 6 && react.current.t >= REACT) react.current.t = 0
+      }}>
       <primitive object={scene} scale={fit.scale} />
+      {/* an easy click target around the whole cat */}
+      <mesh visible={false} position-y={0.2 - fit.lift}>
+        <boxGeometry args={[LENGTH * 0.5, 0.42, LENGTH * 1.05]} />
+      </mesh>
+      {meow && (
+        <Html position-y={0.55 - fit.lift} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+          <div className="tag">meow!</div>
+        </Html>
+      )}
+      <mesh rotation-x={-Math.PI / 2} position-y={0.004 - fit.lift} scale={[LENGTH * 0.55, LENGTH * 1.05, 1]}>
+        <planeGeometry />
+        <meshBasicMaterial map={shadow} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
     </group>
   )
 }
