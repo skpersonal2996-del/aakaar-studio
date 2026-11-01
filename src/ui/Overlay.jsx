@@ -61,6 +61,8 @@ export function Overlay({ ready }) {
   const resetView = useStore((s) => s.resetView)
   const theme = useStore((s) => s.theme)
   const toggleTheme = useStore((s) => s.toggleTheme)
+  const cast = useStore((s) => s.cast)
+  const toggleCast = useStore((s) => s.toggleCast)
   const [hint, setHint] = useState(true)
 
   useEffect(() => {
@@ -107,6 +109,15 @@ export function Overlay({ ready }) {
             <span className="theme-switch__knob" />
           </span>
           <span className="chip__label">{theme === 'night' ? 'Night' : 'Warm'}</span>
+        </button>
+        <button
+          className="chip chip--cast"
+          onClick={toggleCast}
+          aria-pressed={cast === 'chibi'}
+          aria-label={cast === 'chibi' ? 'Switch to the classic characters' : 'Switch to the chibi characters'}
+          title="Switch character style">
+          <span className="chip__led" />
+          <span className="chip__label">{cast === 'chibi' ? 'Chibi' : 'Classic'}</span>
         </button>
         <button className={`chip chip--sound ${music ? 'is-on' : ''}`} onClick={() => {
             if (!music) startMusic()

@@ -3,8 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../store'
 import { rng, shrink } from './textures'
-import { Box } from './parts'
-import { ROOM } from './views'
+import { WINDOW } from './views'
 
 // A minimal window on the right wall looking out over the city: a sunset skyline in the warm
 // theme, a starry night skyline in the night theme. The two views crossfade with the theme.
@@ -114,9 +113,9 @@ function cityTexture(mode) {
   return t
 }
 
-const FRAME = '#141210'
-
-export function CityWindow({ z = -2.0, y = 2.05, width = 2.4, height = 1.8 }) {
+// Only the view itself is live (it crossfades with the theme); the frame and sill are baked.
+export function CityWindow() {
+  const { x, y, z, width, height } = WINDOW
   const day = useMemo(() => cityTexture('sunset'), [])
   const night = useMemo(() => cityTexture('night'), [])
   const nightMat = useRef()
@@ -129,33 +128,22 @@ export function CityWindow({ z = -2.0, y = 2.05, width = 2.4, height = 1.8 }) {
     m.opacity += (to - m.opacity) * (1 - Math.exp(-Math.min(dt, 0.1) * 3.5))
   })
 
-  const x = ROOM.W / 2 - 0.02
-  const t = 0.05 // frame thickness
   return (
     <group position={[x, y, z]} rotation-y={-Math.PI / 2}>
       {/* the view — unlit, so it reads as bright outdoor light */}
-      <mesh position-z={-0.015} userData={{ noShadow: true }}>
+      <mesh position-z={-0.015}>
         <planeGeometry args={[width, height]} />
         <meshBasicMaterial map={day} color={[1.15, 1.1, 1.05]} toneMapped={false} />
       </mesh>
-      <mesh position-z={-0.012} userData={{ noShadow: true }}>
+      <mesh position-z={-0.012}>
         <planeGeometry args={[width, height]} />
         <meshBasicMaterial ref={nightMat} map={night} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {/* faint glass sheen */}
-      <mesh position-z={0.004} userData={{ noShadow: true }}>
+      <mesh position-z={0.004}>
         <planeGeometry args={[width, height]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.04} depthWrite={false} />
       </mesh>
-      {/* slim black frame, one mullion and a transom */}
-      <Box args={[width + t * 2, t, 0.08]} position={[0, height / 2 + t / 2, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      <Box args={[width + t * 2, t, 0.08]} position={[0, -height / 2 - t / 2, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      <Box args={[t, height, 0.08]} position={[-width / 2 - t / 2, 0, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      <Box args={[t, height, 0.08]} position={[width / 2 + t / 2, 0, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      <Box args={[0.025, height, 0.05]} position={[0, 0, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      <Box args={[width, 0.025, 0.05]} position={[0, height * 0.18, 0]} color={FRAME} metalness={0.4} roughness={0.5} />
-      {/* deep sill */}
-      <Box args={[width + 0.2, 0.04, 0.22]} position={[0, -height / 2 - t - 0.02, 0.08]} color="#2a1d14" roughness={0.6} />
     </group>
   )
 }

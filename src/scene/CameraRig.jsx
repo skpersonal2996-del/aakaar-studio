@@ -67,7 +67,7 @@ export function CameraRig() {
   const peek = useStore((s) => s.peek)
   const wide = size.width > 860
   // Portrait screens see less of the room, so the home view backs away from it.
-  const k = THREE.MathUtils.clamp(1.25 / (size.width / size.height), 1, 1.75)
+  const k = THREE.MathUtils.clamp(1.25 / (size.width / size.height), 1, 2.1)
   // back away along the view direction (as if the old 8m orbit were scaled by k)
   const homePos = useMemo(
     () => new THREE.Vector3().fromArray(HOME.pos).addScaledVector(offset.clone().normalize(), (k - 1) * 8).toArray(),

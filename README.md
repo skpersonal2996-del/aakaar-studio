@@ -1,6 +1,6 @@
 # studio-portfolio / aakaar
 
-Aakaar's studio portfolio for Shruti and Vinay. This checkout preserves the original deployed room's 12 × 10 metre layout, face-to-face seating, furniture, camera paths, pulsing hotspots, typing animation, warm/night switch, music, and six sections.
+Aakaar's studio portfolio for Shruti and Vinay. The room is a cozy 9 × 7.7 metre studio lit and baked in Blender Cycles, with face-to-face seating, camera paths, pulsing hotspots, typing animation, warm/night switch, music, and six sections.
 
 ## Development
 
@@ -21,11 +21,11 @@ The package and local project are named `studio-portfolio`, saved at `/Users/vin
 | --- | --- |
 | `src/App.jsx` | Lazy 3D loading, local fonts, deep links, 3D failure boundary |
 | `src/ui/Overlay.jsx` | Original entry, warm/night, music, Explore, Reset and navigation |
-| `src/scene/views.js` | Original room dimensions, object layout, cameras and hotspots |
-| `src/scene/Workspace.jsx` | Original desk and face-to-face seating |
+| `src/scene/views.js` | Room dimensions, cameras, hotspots and click targets |
+| `src/scene/BakedRoom.jsx` | Baked room GLB, lightmap materials, glow meshes and click targets |
 | `src/scene/CameraRig.jsx` | Original camera movements and drag limits |
-| `src/scene/Lights.jsx` | Warm lighting and brighter night fill |
-| `src/scene/Team.jsx` | Restored Meshy models, baked typing loops and founder interactions |
+| `src/scene/Lights.jsx` | Character-only lights (the room's light is baked) |
+| `src/scene/Team.jsx` | Restored Meshy models, seating, baked typing loops and founder interactions |
 | `src/styles.css` | Original visual design and section animations |
 | `src/refinements.css` | Local font names, focus styles and responsive fixes |
 | `src/ui/Panel.jsx` | Portfolio content and keyboard focus management |
@@ -59,15 +59,35 @@ npm run assets:characters
 
 The first two steps expect the downloaded `blender/source/shruti-rig.glb` and `vinay-remesh.glb`. `*-seated.blend` contains editable skeletal controls and guide furniture using the website's dimensions. `*-typing-source.blend` preserves animated controls; `*-typing.blend` contains the baked export action; `*-surface.blend` contains the padded UV maps. `render_hands.py` produces keyboard close-ups. `refresh_surface_pose.py` can transfer an existing padded surface to a revised skeletal animation, asserting that the vertices still match. Large generated projects and raw downloads remain local and are ignored by Git; the runtime GLBs and reproduction scripts are committed. The older `refine_characters.py` facial experiment remains disabled.
 
-## Room materials and details
+## Room: Blender look-dev and baked lighting
 
-The original 12 × 10 metre layout, desk/chair positions, navigation and camera paths are retained. Wood, linen and upholstery use CC0 Poly Haven PBR maps; provenance is recorded in `public/materials/sources.json`. `node scripts/fetch-room-materials.mjs` reproduces the optimized maps. Laptops have instanced keys, hinges and trackpads; chairs have seam piping, mugs have open rims and a visible coffee surface, and larger plant leaves have curved, subtly asymmetric blades. Small leaves retain a lower geometry count. Floor reflections are softened.
+Blender is the source of truth for the room. The web renders it unlit: one merged mesh multiplied by a baked albedo atlas and a baked lightmap (`MeshBasicMaterial` map × lightMap), so the room costs one draw call and no real-time lights. Only the characters, the sign and the city view are lit or animated live. Research and trade-offs are in `docs/web-rendering-2026.md`.
 
-`blender/studio-portfolio.blend` is the current complete editable scene: original web room geometry and materials, both characters, animated skeletal controls, a home camera, and a Blender evening light rig. It is a local generated artifact. To rebuild it, open `http://127.0.0.1:5173/?authoring`, choose **Export Blender room**, copy the download to `blender/generated/room-web.glb`, then run `blender --background --python-exit-code 1 --python blender/build_full_scene.py`. Browser-specific bloom, ambient lighting and interactions are owned by React; Blender uses its own area lighting for review renders. Authoring and render-isolation controls are development-only and excluded from production builds.
+Reproduction, using Blender 5.2 LTS (Metal GPU) from the repository root (`blender` = the Blender binary):
 
-`blender/aakaar-studio.blend` and its Python build/export/render scripts retain the earlier procedural Blender experiment. It is separate from the current room. Raw and archived first-pass web assets are under the ignored `blender/generated/` directory.
+```sh
+blender --background --python-exit-code 1 --python blender/build_cozy_room.py          # cozy layout → blender/studio-cozy.blend
+python3 blender/fetch_polyhaven_props.py && python3 blender/fetch_polyhaven_textures.py   # CC0 props and textures
+blender --background blender/studio-cozy.blend --python-exit-code 1 --python blender/dress_cozy_room.py
+blender --background --factory-startup --python-exit-code 1 --python blender/build_furniture.py   # → furniture-library.blend
+bash blender/meshy_batch.sh && bash blender/meshy_collect.sh                               # Meshy models (credits; see below)
+blender --background --python-exit-code 1 --python blender/assemble_cozy_room.py       # → studio-assembled.blend
+for c in "guy vinay 1.0" "girl shruti 1.0" "chibi-guy vinay 1.35" "chibi-girl shruti 1.35"; do
+  blender --background --factory-startup --python-exit-code 1 --python blender/seat_meshy_character.py -- $c; done
+blender --background --python-exit-code 1 --python blender/place_characters.py -- adult   # and -- chibi
+blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/bake_cozy_room.py -- 4096 256
+blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/export_live_props.py
+npm run assets:room && npm run assets:characters                                           # → public/studio, public/characters
+```
 
-The Blender scripts need Blender 5.2 LTS. `build_studio.py` regenerates that experimental scene; `export_scene.py` preserves manual edits while exporting it. Do not run the experimental room pipeline to replace the original web layout.
+- `build_cozy_room.py` starts from `studio-portfolio.blend` (the earlier web room plus characters), shrinks the shell and rearranges the furniture. The desk and characters keep their positions.
+- `dress_cozy_room.py` adds Poly Haven props (CC0) and the Meshy toy car (`blender/source/meshy/toy-car.glb`, generated in the studio's Meshy workspace).
+- `lookdev_cozy.py` sets the warm evening light rig, practical lamps, wall colours, hero camera, soft bevels and AgX view. Both `render_cozy.py` and `bake_cozy_room.py` apply it.
+- `bake_cozy_room.py` unwraps each part, packs them into one atlas at weighted texel density, bakes a 4K albedo and a 2K diffuse lightmap, and exports the merged room, cut-out leaves and glow meshes.
+- `build_furniture.py` builds the hard-surface furniture (desk, cabinets, shelving, lamps, rug, framed art) at real size with Poly Haven wood, metal and jute textures. `assemble_cozy_room.py` replaces the old web furniture with it and with the Meshy models (characters, sofa and cushions, chairs, plants, laptops, desk props), generated from the reference PNGs in `output/meshy-reference-assets-2026-10-31/v2/` (brief: `output/meshy-image-brief.md`). `blender/review-models.html` previews every Meshy model next to its reference (served by `npm run dev`).
+- `seat_meshy_character.py` seats a Meshy-rigged character: it joins the imported bone tails to the next joint, adds two finger bones per hand, keeps the head and long hair rigid, poses the body with IK and bakes `TypingIdle` (8 s) plus an upper-body `Wave` (2.6 s, the hand nearer the camera). `place_characters.py` seats a pair in the room and records where chairs and laptops go (`SEATS` in `src/scene/views.js`).
+- Two character pairs ship: classic (`vinay`, `shruti`) and chibi (`vinay-chibi`, `shruti-chibi`). The top-bar toggle switches them; characters, office chairs and laptops are live meshes, not baked, so each pair sits at its own distance. Hovering a character plays the wave over the typing loop.
+- Warm and night lighting are both baked; the website blends the two lightmaps.
 
 ## Behavior and checks
 

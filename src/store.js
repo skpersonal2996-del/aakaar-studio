@@ -21,4 +21,7 @@ export const useStore = create((set) => ({
   // 'warm' (amber evening, the default) or 'night' (dim blue, pink and black)
   theme: 'warm',
   toggleTheme: () => set((s) => ({ theme: s.theme === 'warm' ? 'night' : 'warm' })),
+  // which character pair sits at the desk: 'chibi' (big heads, as in the reference board) or 'classic'
+  cast: 'chibi',
+  toggleCast: () => set((s) => ({ cast: s.cast === 'chibi' ? 'classic' : 'chibi' })),
 }))

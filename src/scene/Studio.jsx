@@ -1,23 +1,21 @@
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Environment, Lightformer, SoftShadows } from '@react-three/drei'
-import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { Environment } from '@react-three/drei'
+import { Bloom, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { useStore } from '../store'
 import { CameraRig } from './CameraRig'
 import { Hotspots } from './Interactive'
-import { Room } from './Room'
 import { Lights } from './Lights'
-import { Lounge } from './Lounge'
-import { Workspace } from './Workspace'
-import { Bookshelf } from './Bookshelf'
-import { Credenza, Pegboard, Sign } from './Feature'
-import { Plants } from './Plants'
+import { BakedRoom, RoomReflection } from './BakedRoom'
+import { Team } from './Team'
+import { Sign } from './Feature'
 import { CityWindow } from './CityWindow'
+import { DESK } from './views'
 const DevSceneTools = import.meta.env.DEV ? lazy(()=>import('./DevSceneTools')) : null
 
-// Every opaque mesh casts and receives shadows unless it opts out (glows, screens, glass).
-// The room never moves, so shadow maps are drawn once after load instead of every frame.
+// Only lit (non-basic) meshes cast and receive shadows: in practice the two characters, since the
+// room's shadows are baked. Shadow maps are drawn once after load instead of every frame.
 function ShadowSetup() {
   const scene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
@@ -86,33 +84,25 @@ export function Studio({ onReady }) {
   return (
     <>
       <color attach="background" args={['#0b0908']} />
-      {/* contact-hardening shadows give the soft, miniature clay-render look */}
-      <SoftShadows size={24} samples={12} focus={0.6} />
       <CameraRig />
       <Lights />
-      <Environment resolution={128} environmentIntensity={0.4} frames={1}>
-        <Lightformer form="rect" intensity={2} color="#ffb070" position={[0, 3, -4]} scale={[6, 1, 1]} />
-        <Lightformer form="rect" intensity={1.2} color="#ff9a4a" position={[2, 2.5, -4]} scale={[2, 1, 1]} />
-        <Lightformer form="rect" intensity={1} color="#ffe2c2" position={[0, 4, 0]} rotation-x={Math.PI / 2} scale={[4, 4, 1]} />
+      {/* the characters reflect the baked room, captured once from the middle of the desk */}
+      <Environment resolution={128} environmentIntensity={0.55} frames={1}>
+        <RoomReflection position={[-DESK[0], -1.1, -DESK[2]]} />
       </Environment>
-      <Room />
-      <Lounge />
-      <Workspace />
-      <Bookshelf />
-      <Credenza />
+      <BakedRoom />
+      <Team />
       <Sign />
-      <Pegboard />
-      <Plants />
       <CityWindow />
       {DevSceneTools && <Suspense fallback={null}><DevSceneTools /></Suspense>}
       <Hotspots />
       <ShadowSetup />
       <FrameDriver />
       <Ready onReady={onReady} />
+      {/* lighting and AO are baked; AgX matches Blender's view transform */}
       <EffectComposer multisampling={4}>
-        <N8AO aoRadius={0.5} intensity={1.6} distanceFalloff={0.6} color="#0f0704" />
-        <Bloom mipmapBlur luminanceThreshold={1.2} luminanceSmoothing={0.2} intensity={0.6} radius={0.55} />
-        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <Bloom mipmapBlur luminanceThreshold={1.0} luminanceSmoothing={0.2} intensity={0.55} radius={0.6} />
+        <ToneMapping mode={ToneMappingMode.AGX} />
         <Vignette offset={0.4} darkness={0.35} />
       </EffectComposer>
     </>

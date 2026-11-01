@@ -20,3 +20,10 @@ dist/
 .DS_Store
 *.log
 .env*
+blender/studio-cozy.blend
+blender/studio-assembled.blend
+blender/furniture-library.blend
+blender/studio-adult.blend
+blender/studio-chibi.blend
+blender/*-seated.blend
+output/

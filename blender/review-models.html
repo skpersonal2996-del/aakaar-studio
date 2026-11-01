@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aakaar · Meshy model review</title>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#161413;color:#f1e8de}*{box-sizing:border-box}body{margin:0;padding:20px;max-width:1280px}h1{font-size:28px;margin:0 0 8px}p{color:#beb1a5;line-height:1.5;margin:8px 0 18px;max-width:780px}button{border:1px solid #655447;border-radius:8px;background:#2d2520;color:#f7e8d9;padding:8px 14px;font:inherit;cursor:pointer}button:hover{background:#3a2f28}button:focus-visible,textarea:focus-visible{outline:3px solid #f6b77c;outline-offset:2px}.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px}.bar span{color:#d7a26a;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}figure{margin:0;background:#211c18;border:1px solid #493a31;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}.stage{position:relative;aspect-ratio:1;background:#2a2420}model-viewer{width:100%;height:100%;--poster-color:transparent;background:#2a2420}.ref{position:absolute;inset:0;object-fit:contain;width:100%;height:100%;background:#d6d4d1;display:none}.stage.show-ref .ref{display:block}.load{position:absolute;left:50%;bottom:14px;transform:translateX(-50%)}figcaption{padding:12px 14px 4px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}figcaption b{font-size:16px}figcaption small{color:#bca18d;font-size:12px;text-align:right}.tools{display:flex;gap:6px;padding:6px 14px}.tools button{padding:5px 10px;font-size:13px}textarea{margin:6px 14px 14px;min-height:54px;resize:vertical;background:#171310;color:#f1e8de;border:1px solid #493a31;border-radius:8px;padding:8px;font:inherit;font-size:14px}.heavy{color:#e9a36b}@media(max-width:600px){body{padding:16px}.grid{grid-template-columns:1fr}}
+</style>
+<h1>Meshy model review</h1>
+<p>Click <b>Load 3D</b> on a card, then drag to orbit and scroll or pinch to zoom. <b>Reference</b> shows the image the model was generated from. Write anything you want changed in the box under each model, then press <b>Copy all notes</b> and paste them to me. Models are shown exactly as Meshy delivered them; colours look slightly lighter than in the room, which adds warm lighting.</p>
+<div class="bar"><button id="copy">Copy all notes</button><span id="status" role="status"></span></div>
+<div class="grid" id="grid"></div>
+<script type="module">
+const V2 = '../output/meshy-reference-assets-2026-10-31/v2/'
+// name, file, reference image, triangles, MB, note on what happens before it reaches the website
+const MODELS = [
+  ['Guy', 'guy-rigged', V2 + '01-guy-three-quarter.png', 99999, 7.8, 'Rigged (24 bones, no finger bones yet)'],
+  ['Girl', 'girl-rigged', V2 + '02-girl-three-quarter.png', 100000, 8.1, 'Rigged (24 bones, no finger bones yet)'],
+  ['Office chair', 'office-chair', V2 + '04-office-chair-three-quarter.png', 427862, 27.3, 'Reduced for the web later'],
+  ['Sofa', 'sofa', 'source/meshy/sofa-image/image_0.png', 264676, 29.1, 'Reduced for the web later'],
+  ['Orange cushion', 'orange-cushion', V2 + '29-orange-cushion-three-quarter.png', 238596, 35, 'Reduced for the web later'],
+  ['Gingham cushion', 'gingham-cushion', V2 + '30-gingham-cushion-three-quarter.png', 459772, 39.4, 'Reduced for the web later'],
+  ['Large plant', 'large-plant', V2 + '15-large-plant-three-quarter.png', 745010, 37.2, 'Reduced for the web later'],
+  ['Floor plant', 'floor-plant', V2 + '16-floor-plant-three-quarter.png', 564306, 31.5, 'Reduced for the web later'],
+  ['Laptop', 'laptop', V2 + '20-laptop-three-quarter.png', 1530596, 64.5, 'Heavy file; loads slowly'],
+  ['Mug', 'mug', V2 + '21-mug-three-quarter.png', 86398, 18.4, ''],
+  ['Book stack', 'book-stack', V2 + '22-book-stack-three-quarter.png', 133074, 27.1, ''],
+  ['Pencil cup', 'pencil-cup', V2 + '25-pencil-cup-three-quarter.png', 200382, 17.9, ''],
+  ['Toy car (earlier)', 'toy-car', null, 611888, 23.9, 'Made earlier from a text prompt'],
+]
+const grid = document.getElementById('grid')
+const saved = (() => { try { return JSON.parse(localStorage.getItem('meshy-review-notes') || '{}') } catch { return {} } })()
+const store = () => { try { localStorage.setItem('meshy-review-notes', JSON.stringify(saved)) } catch {} }
+for (const [title, file, ref, tris, mb, note] of MODELS) {
+  const card = document.createElement('figure')
+  card.innerHTML = `
+    <div class="stage">
+      <model-viewer src="source/meshy/${file}.glb" poster="source/meshy/${file.replace('-rigged', '')}-preview.png" reveal="manual" loading="lazy"
+        camera-controls touch-action="pan-y" shadow-intensity="0.8" exposure="0.95" tone-mapping="neutral" interaction-prompt="none" alt="${title} 3D model"></model-viewer>
+      ${ref ? `<img class="ref" src="${ref}" alt="${title} reference image">` : ''}
+      <button class="load">Load 3D (${mb} MB)</button>
+    </div>
+    <figcaption><b>${title}</b><small>${tris.toLocaleString()} triangles · ${mb} MB${note ? `<br><span class="${mb > 40 ? 'heavy' : ''}">${note}</span>` : ''}</small></figcaption>
+    <div class="tools">${ref ? '<button class="toggle" aria-pressed="false">Reference</button>' : ''}<button class="reset">Reset view</button></div>
+    <textarea aria-label="Notes for ${title}" placeholder="Notes for ${title}…"></textarea>`
+  const viewer = card.querySelector('model-viewer'), stage = card.querySelector('.stage'), load = card.querySelector('.load')
+  load.addEventListener('click', () => { viewer.dismissPoster(); load.textContent = 'Loading…'; load.disabled = true })
+  viewer.addEventListener('load', () => load.remove())
+  viewer.addEventListener('error', () => { load.textContent = 'Could not load'; })
+  card.querySelector('.reset').addEventListener('click', () => { viewer.cameraOrbit = 'auto auto auto'; viewer.fieldOfView = 'auto'; viewer.jumpCameraToGoal?.() })
+  const toggle = card.querySelector('.toggle')
+  toggle?.addEventListener('click', () => { const on = stage.classList.toggle('show-ref'); toggle.setAttribute('aria-pressed', String(on)) })
+  const notes = card.querySelector('textarea'); notes.value = saved[title] || ''
+  notes.addEventListener('input', () => { saved[title] = notes.value; store() })
+  grid.append(card)
+}
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = MODELS.map(([t]) => saved[t]?.trim() ? `${t}: ${saved[t].trim()}` : null).filter(Boolean).join('\n') || 'All models approved, no changes.'
+  const status = document.getElementById('status')
+  try { await navigator.clipboard.writeText(text); status.textContent = 'Notes copied. Paste them into the chat.' }
+  catch { status.textContent = 'Copy blocked; select the text below and copy it.'; const pre = document.createElement('pre'); pre.textContent = text; status.append(pre) }
+})
+</script></html>
