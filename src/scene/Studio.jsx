@@ -9,6 +9,7 @@ import { Hotspots } from './Interactive'
 import { Lights } from './Lights'
 import { BakedRoom, RoomReflection } from './BakedRoom'
 import { Team } from './Team'
+import { Cat } from './Cat'
 import { Sign } from './Feature'
 import { CityWindow } from './CityWindow'
 import { DESK } from './views'
@@ -92,6 +93,7 @@ export function Studio({ onReady }) {
       </Environment>
       <BakedRoom />
       <Team />
+      <Cat />
       <Sign />
       <CityWindow />
       {DevSceneTools && <Suspense fallback={null}><DevSceneTools /></Suspense>}

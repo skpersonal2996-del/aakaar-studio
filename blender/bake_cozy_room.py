@@ -18,6 +18,7 @@ Outputs in blender/generated/room-bake/ (all lighting on one shared 'Bake' UV se
 The website multiplies them: MeshBasicMaterial({ map, lightMap, lightMapIntensity: π·scale }).
 """
 import bpy, bmesh, json, math, sys
+from mathutils import Vector
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -35,7 +36,7 @@ OUT = ROOT / ('generated/room-bake' if LOOKDEV == 'lookdev_cozy.py' else f'gener
 exec((ROOT / LOOKDEV).read_text(), LOOK)
 scene = bpy.context.scene
 O = bpy.data.objects
-REACT_OWNED = {'Mesh_499', 'Mesh_603', 'Mesh_604', 'Mesh_605'}  # sign glow and city view stay live in React
+REACT_OWNED = {'Mesh_499', 'Mesh_603', 'Mesh_604', 'Mesh_605', 'City view'}  # sign glow and city view stay live in React
 
 
 def emits(o):
@@ -210,6 +211,30 @@ for _ in range(30):
 shelf(lo, place=True)
 print('BAKE packed', len(charts), 'parts at', round(lo * LIGHT_SIZE, 1), 'lightmap px/m', flush=True)
 
+# Plants sway on the website: '_WIND' runs from 0 at the pot to 1 at the leaf tips (the trailing plant hangs,
+# so its tips are at the bottom) and tells the vertex shader how far each vertex may move.
+PLANT_WORDS = ('plant', 'calathea', 'succulent', 'leaves')
+
+
+def plant_root(src):
+    root = None
+    while src:
+        if any(k in src.name.lower() for k in PLANT_WORDS): root = src
+        src = src.parent
+    return root
+
+
+for o, src in zip(parts + detail_copies, static + textured):
+    root = plant_root(src)
+    if not root or not o.data.vertices: continue
+    zs = [(d.matrix_world @ Vector(c)).z for d in (root, *root.children_recursive) if d.type == 'MESH' for c in d.bound_box]
+    lo_z, hi_z = min(zs), max(zs)
+    co = np.empty(len(o.data.vertices) * 3, np.float32); o.data.vertices.foreach_get('co', co)
+    t = np.clip((co[2::3] - lo_z) / max(hi_z - lo_z, .01), 0, 1)
+    if 'trailing' in root.name.lower(): t = 1 - t
+    wind = o.data.attributes.new('_WIND', 'FLOAT', 'POINT')
+    wind.data.foreach_set('value', (np.clip((t - .3) / .7, 0, 1) ** 1.5).astype(np.float32))
+
 desk_copies = [p for p, src in zip(parts, static) if glossy(src)]
 room = join([p for p in parts if p not in desk_copies], 'Room · baked')
 desk = join(desk_copies, 'Glossy · desk top')
@@ -273,6 +298,10 @@ def bake_light(theme):
 
 
 bake_light('warm')
+# Glow colours by theme: the website crossfades lamps and LEDs with the lightmaps.
+warm_glow = {s.material.name: [c * s.material.node_tree.nodes['Emission'].inputs['Strength'].default_value
+                               for c in s.material.node_tree.nodes['Emission'].inputs['Color'].default_value[:3]]
+             for g in glow_copies for s in g.material_slots}
 LOOK['night']()
 bake_light('night')
 scale = scales['warm']
@@ -286,7 +315,8 @@ for g in glow_copies:
     for s in g.material_slots:
         nt = s.material.node_tree; em = nt.nodes.get('Emission')
         c = em.inputs['Color'].default_value; k = em.inputs['Strength'].default_value
-        s.material['web_emissive'] = [c[0] * k, c[1] * k, c[2] * k]
+        s.material['web_emissive'] = warm_glow[s.material.name]
+        s.material['web_emissive_night'] = [c[0] * k, c[1] * k, c[2] * k]
         tex = next((n for n in nt.nodes if n.bl_idname == 'ShaderNodeTexImage' and n.name != 'Web bake target'), None)
         if tex and em.inputs['Color'].is_linked:
             # Screens: export the UI image as the emissive texture so the website can show it.
@@ -336,7 +366,7 @@ bpy.ops.object.select_all(action='DESELECT')
 for o in [room, desk, props, *glow_copies]: o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=str(OUT / 'room.glb'), use_selection=True, export_format='GLB',
                           export_materials='EXPORT', export_extras=True, export_texcoords=True, export_normals=False,
-                          export_apply=True, export_yup=True, export_image_format='WEBP', export_image_quality=85)
+                          export_apply=True, export_yup=True, export_attributes=True, export_image_format='WEBP', export_image_quality=85)
 (OUT / 'room-bake.json').write_text(json.dumps({'lightScale': scales, 'lightSize': LIGHT_SIZE, 'albedoSize': ALBEDO_SIZE,
                                                 'samples': SAMPLES, 'faces': len(me.polygons)}, indent=2))
 print('BAKE_COMPLETE', len(me.polygons), 'faces', flush=True)

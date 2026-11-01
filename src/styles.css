@@ -102,8 +102,8 @@ a { color: inherit; }
 .dock button.is-active { background: rgba(255, 95, 162, 0.16); color: #ffd3e6; }
 .dock button.is-active .dock__index { font-size: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 8px var(--pink); align-self: center; }
 
-.hint {
-  position: absolute; left: 50%; top: 24px; transform: translateX(-50%);
+.hint { /* above the dock, so the top bar's chips have the full width */
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; color: var(--muted);
   padding: 8px 14px; border-radius: 999px; background: rgba(10, 8, 7, 0.45);
 }

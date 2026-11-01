@@ -1,149 +1,142 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { rng, shrink } from './textures'
 import { WINDOW } from './views'
 
-// A minimal window on the right wall looking out over the city: a sunset skyline in the warm
-// theme, a starry night skyline in the night theme. The two views crossfade with the theme.
+// The window on the right wall, looking out over the city: the same skyline at sunset in the warm
+// theme and lit up at night in the night theme (painted for this project, see
+// public/studio/window-sources.json). The two views crossfade with the theme.
+//
+// The view is drawn on the glass itself, but the shader traces each pixel's view ray to a virtual
+// photo plane DEPTH metres behind the glass, so the city shifts with parallax as the camera orbits,
+// whatever the wall geometry behind it. A faint Fresnel reflection of the room sits on top.
 
-const SKIES = {
-  sunset: {
-    sky: [
-      [0, '#3a2a5e'],
-      [0.38, '#b85d86'],
-      [0.62, '#f08a6a'],
-      [0.8, '#ffc27a'],
-      [1, '#ffe2a8'],
-    ],
-    layers: ['#b06a80', '#6e3d58', '#3a2236'],
-    lit: ['#ffd9a0', '#ffb070'],
-    litChance: [0.08, 0.12, 0.16],
-  },
-  night: {
-    sky: [
-      [0, '#05081f'],
-      [0.5, '#121a4a'],
-      [0.85, '#2c2361'],
-      [1, '#4a2a66'],
-    ],
-    layers: ['#1d2150', '#121436', '#07081c'],
-    lit: ['#ffd27a', '#ff8fc8', '#9fc2ff'],
-    litChance: [0.22, 0.32, 0.4],
-  },
-}
+const base = import.meta.env.BASE_URL
+const VIEWS = ['window-dusk.webp', 'window-night.webp'].map((f) => `${base}studio/${f}`)
+useTexture.preload(VIEWS)
 
-function cityTexture(mode) {
-  const W = 1024
-  const H = 768
-  const c = document.createElement('canvas')
-  c.width = W
-  c.height = H
-  const x = c.getContext('2d')
-  const s = SKIES[mode]
-  const r = rng(mode === 'night' ? 71 : 37)
+const DEPTH = 0.5 // metres from the glass to the virtual photo plane
+const SPREAD = 1.6 // the photo plane is this much larger than the glass, so oblique views stay on it
+// Linear multipliers before the scene's AgX tone mapping: bright outdoors that only just reaches
+// the bloom threshold (1.0) in the sunset and the city lights, without clipping to white.
+const BRIGHTNESS = { warm: 1.05, night: 1.15 }
+const REFLECTION = { warm: new THREE.Color('#ffb98a'), night: new THREE.Color('#b88a9a') }
+const FRAME = '#141210'
 
-  // sky
-  const g = x.createLinearGradient(0, 0, 0, H * 0.85)
-  s.sky.forEach(([o, col]) => g.addColorStop(o, col))
-  x.fillStyle = g
-  x.fillRect(0, 0, W, H)
-
-  if (mode === 'sunset') {
-    // low sun with a soft halo
-    const sun = x.createRadialGradient(W * 0.68, H * 0.62, 0, W * 0.68, H * 0.62, 260)
-    sun.addColorStop(0, 'rgba(255,245,215,1)')
-    sun.addColorStop(0.18, 'rgba(255,225,170,0.95)')
-    sun.addColorStop(0.4, 'rgba(255,170,110,0.35)')
-    sun.addColorStop(1, 'rgba(255,140,100,0)')
-    x.fillStyle = sun
-    x.fillRect(0, 0, W, H)
-    // a few soft clouds
-    x.fillStyle = 'rgba(255,200,170,0.35)'
-    for (let i = 0; i < 6; i++) {
-      x.beginPath()
-      x.ellipse(r() * W, 80 + r() * 220, 80 + r() * 140, 8 + r() * 10, 0, 0, Math.PI * 2)
-      x.fill()
-    }
-  } else {
-    // stars and a moon
-    for (let i = 0; i < 220; i++) {
-      x.fillStyle = `rgba(255,255,255,${0.3 + r() * 0.7})`
-      const sz = r() < 0.9 ? 1.2 : 2.2
-      x.fillRect(r() * W, r() * H * 0.55, sz, sz)
-    }
-    const moon = x.createRadialGradient(W * 0.25, H * 0.2, 0, W * 0.25, H * 0.2, 120)
-    moon.addColorStop(0, 'rgba(255,248,235,1)')
-    moon.addColorStop(0.28, 'rgba(255,240,225,1)')
-    moon.addColorStop(0.32, 'rgba(200,190,255,0.35)')
-    moon.addColorStop(1, 'rgba(160,150,255,0)')
-    x.fillStyle = moon
-    x.fillRect(0, 0, W, H)
+const vertexShader = /* glsl */ `
+  varying vec3 vLocal;
+  varying vec3 vCamera;
+  void main() {
+    vLocal = position;
+    vCamera = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz; // the camera in the window's space
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
+`
 
-  // three layers of buildings, far to near
-  s.layers.forEach((col, li) => {
-    let bx = -20
-    const base = H * (0.5 + li * 0.12)
-    while (bx < W) {
-      const bw = 40 + r() * 90
-      const bh = (0.35 + r() * 0.65) * (H - base) * 0.9 + 40 + li * 30
-      const top = H - bh
-      x.fillStyle = col
-      x.fillRect(bx, top, bw, bh)
-      if (r() < 0.25) x.fillRect(bx + bw * 0.4, top - 30, 4, 30) // antenna
-      // windows
-      for (let wy = top + 12; wy < H - 8; wy += 16)
-        for (let wx = bx + 8; wx < bx + bw - 10; wx += 13)
-          if (r() < s.litChance[li]) {
-            x.fillStyle = s.lit[Math.floor(r() * s.lit.length)]
-            x.globalAlpha = 0.55 + li * 0.15
-            x.fillRect(wx, wy, 6, 8)
-            x.globalAlpha = 1
-          }
-      bx += bw + 2 + r() * 10
-    }
-  })
+const fragmentShader = /* glsl */ `
+  uniform sampler2D dusk, night;
+  uniform float mixNight, brightness, depth, reflection;
+  uniform vec2 size, plane;
+  uniform vec3 reflectColor;
+  varying vec3 vLocal;
+  varying vec3 vCamera;
 
-  // it's far-off scenery behind glass, so half resolution is plenty
-  const t = new THREE.CanvasTexture(shrink(c, 0.5))
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 2
-  return t
-}
+  void main() {
+    vec3 dir = normalize(vLocal - vCamera); // into the glass is -z
+    float facing = max(-dir.z, 1e-3);
 
-// Only the view itself is live (it crossfades with the theme); the frame and sill are baked.
-export function CityWindow() {
+    // the city: where this view ray meets the photo plane behind the glass
+    vec2 hit = vLocal.xy + dir.xy * (depth / facing);
+    vec2 uv = clamp(hit / plane + 0.5, 0.0, 1.0);
+    vec3 city = mix(texture2D(dusk, uv).rgb, texture2D(night, uv).rgb, mixNight) * brightness;
+
+    // a little shade where the glass meets the frame
+    vec2 edge = 0.5 * size - abs(vLocal.xy);
+    city *= mix(0.78, 1.0, smoothstep(0.0, 0.09, min(edge.x, edge.y)));
+
+    // glass: a faint reflection of the warm (or blue) room, stronger at grazing angles, and a soft
+    // diagonal sheen
+    float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
+    float sheen = smoothstep(0.35, 0.0, abs(dot(vLocal.xy / size, vec2(0.8, 0.6)) + 0.12)) * 0.05;
+    vec3 glass = reflectColor * (fresnel * reflection + sheen);
+
+    gl_FragColor = vec4(city * (1.0 - fresnel * 0.6) + glass, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`
+
+export function CityWindow({ frame = true }) {
   const { x, y, z, width, height } = WINDOW
-  const day = useMemo(() => cityTexture('sunset'), [])
-  const night = useMemo(() => cityTexture('night'), [])
-  const nightMat = useRef()
+  const [dusk, night] = useTexture(VIEWS)
   const theme = useStore((s) => s.theme)
+  const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
+
+  const material = useMemo(() => {
+    for (const t of [dusk, night]) {
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = 8
+      t.needsUpdate = true
+    }
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        dusk: { value: dusk },
+        night: { value: night },
+        mixNight: { value: 0 },
+        brightness: { value: BRIGHTNESS.warm },
+        depth: { value: DEPTH },
+        reflection: { value: 0.3 },
+        size: { value: new THREE.Vector2(width, height) },
+        plane: { value: new THREE.Vector2(width * SPREAD, width * SPREAD * 0.75) }, // the photos are 4:3
+        reflectColor: { value: REFLECTION.warm.clone() },
+      },
+      vertexShader,
+      fragmentShader,
+      toneMapped: false,
+    })
+  }, [dusk, night, width, height])
 
   // crossfade the outside view with the theme
   useFrame((_, dt) => {
-    const m = nightMat.current
+    const u = material.uniforms
     const to = theme === 'night' ? 1 : 0
-    m.opacity += (to - m.opacity) * (1 - Math.exp(-Math.min(dt, 0.1) * 3.5))
+    const m = (u.mixNight.value = reduced ? to : u.mixNight.value + (to - u.mixNight.value) * (1 - Math.exp(-Math.min(dt, 0.1) * 3.5)))
+    u.brightness.value = THREE.MathUtils.lerp(BRIGHTNESS.warm, BRIGHTNESS.night, m)
+    u.reflectColor.value.lerpColors(REFLECTION.warm, REFLECTION.night, m)
   })
+
+  const t = 0.05 // frame thickness
+  const bar = (args, position, key) => (
+    <mesh key={key} position={position} castShadow={false} receiveShadow userData={{ noShadow: true }}>
+      <boxGeometry args={args} />
+      <meshStandardMaterial color={FRAME} metalness={0.4} roughness={0.5} />
+    </mesh>
+  )
 
   return (
     <group position={[x, y, z]} rotation-y={-Math.PI / 2}>
-      {/* the view — unlit, so it reads as bright outdoor light */}
-      <mesh position-z={-0.015}>
+      {/* the view and the glass, unlit so it reads as bright outdoor light */}
+      <mesh material={material} userData={{ noShadow: true }}>
         <planeGeometry args={[width, height]} />
-        <meshBasicMaterial map={day} color={[1.15, 1.1, 1.05]} toneMapped={false} />
       </mesh>
-      <mesh position-z={-0.012}>
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial ref={nightMat} map={night} transparent opacity={0} depthWrite={false} toneMapped={false} />
-      </mesh>
-      {/* faint glass sheen */}
-      <mesh position-z={0.004}>
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.04} depthWrite={false} />
-      </mesh>
+      {frame && (
+        <>
+          {/* slim black frame, one mullion and a transom */}
+          {bar([width + t * 2, t, 0.08], [0, height / 2 + t / 2, 0], 'top')}
+          {bar([width + t * 2, t, 0.08], [0, -height / 2 - t / 2, 0], 'bottom')}
+          {bar([t, height, 0.08], [-width / 2 - t / 2, 0, 0], 'left')}
+          {bar([t, height, 0.08], [width / 2 + t / 2, 0, 0], 'right')}
+          {bar([0.025, height, 0.05], [0, 0, 0], 'mullion')}
+          {bar([width, 0.025, 0.05], [0, height * 0.18, 0], 'transom')}
+          {/* deep sill */}
+          <mesh position={[0, -height / 2 - t - 0.02, 0.08]} receiveShadow userData={{ noShadow: true }}>
+            <boxGeometry args={[width + 0.2, 0.04, 0.22]} />
+            <meshStandardMaterial color="#2a1d14" roughness={0.6} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }

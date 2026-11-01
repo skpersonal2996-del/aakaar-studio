@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { NAV, SECTIONS, STUDIO } from '../content'
 import { Panel } from './Panel'
 import { startMusic, stopMusic } from '../audio/lofi'
+import { ROOM_ID, ROOM_LABELS, ROOMS } from '../scene/views'
 
 function Loader({ ready }) {
   const entered = useStore((s) => s.entered)
@@ -118,6 +119,18 @@ export function Overlay({ ready }) {
           title="Switch character style">
           <span className="chip__led" />
           <span className="chip__label">{cast === 'chibi' ? 'Chibi' : 'Classic'}</span>
+        </button>
+        <button
+          className="chip chip--cast"
+          onClick={() => { // each room bakes its own scene, so switching reloads the page
+            const next = ROOMS[(ROOMS.indexOf(ROOM_ID) + 1) % ROOMS.length]
+            const query = new URLSearchParams(window.location.search); query.set('room', next)
+            window.location.search = query.toString()
+          }}
+          aria-label={`Room: ${ROOM_LABELS[ROOM_ID]}. Switch to the ${ROOM_LABELS[ROOMS[(ROOMS.indexOf(ROOM_ID) + 1) % ROOMS.length]]} room`}
+          title="Switch room">
+          <span className="chip__led" />
+          <span className="chip__label">{ROOM_LABELS[ROOM_ID]}</span>
         </button>
         <button className={`chip chip--sound ${music ? 'is-on' : ''}`} onClick={() => {
             if (!music) startMusic()

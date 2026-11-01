@@ -101,9 +101,13 @@ furniture('Open shelf · walnut', (*OPEN_SHELF, 0))
 # face each seat; place_characters.py moves them to each character pair's hands.
 furniture('Laptop · aluminium', (-.86, -1.05, .765), rot=-math.pi / 2).name = 'Laptop · Vinay'
 furniture('Laptop · aluminium', (1.26, -.78, .765), rot=math.pi / 2).name = 'Laptop · Shruti'
+# In the spacious room the two prints swap: the 'Good design' poster above the sofa, the abstract art by the shelf.
+prints = {'Art print': 'Poster · framed', 'Poster': 'Wall art · framed'} if SPACIOUS else \
+    {'Art print': 'Wall art · framed', 'Poster': 'Poster · framed'}
 for name, (lo, hi) in frames.items():
-    furniture({'Art print': 'Wall art · framed', 'Poster': 'Poster · framed'}[name],
-              ((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))
+    frame = furniture(prints[name], ((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))
+    bpy.context.view_layer.update(); flo, fhi = bbox(tree(frame))
+    frame.scale = ((hi.z - lo.z) / (fhi.z - flo.z),) * 3  # fills the old print's height
 
 # --- Meshy models -----------------------------------------------------------------------------
 
