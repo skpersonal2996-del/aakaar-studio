@@ -118,7 +118,7 @@ function cut(o) {
 // TEMPORARY as well: the pot's shadow is baked into the desk top's light as a dark ring. Where the desk top maps into
 // the lightmaps is found from one of its upward-facing triangles, and the ring's texels are filled in smoothly from
 // the light around them (a few hundred relaxation passes over a small patch), in both lightmaps.
-const RING = { x: 0.2, z: 0.85, radius: 0.22 }
+const RING = { x: 0.2, z: 0.85, radius: 0.3 }
 function eraseRing(desk, textures) {
   const g = desk.geometry, pos = g.attributes.position, uv = g.attributes.uv1
   if (!uv) return

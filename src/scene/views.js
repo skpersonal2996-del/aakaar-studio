@@ -36,7 +36,7 @@ export const SEATS = {
 
 // The first site's wide view from beyond the open front (the hero camera in lookdev_spacious.py).
 export const INTRO = { pos: [0.6, 3.4, 13.5], target: [0.3, 1.5, -2.0] }
-export const HOME = { pos: [0.3, 1.8, 6.0], target: [0.3, 1.6, 2.8] }
+export const HOME = { pos: [0.3, 1.95, 7.2], target: [0.3, 1.55, 2.7] }
 
 // Camera framing for each section: where the camera goes and what it looks at.
 export const VIEWS = {
