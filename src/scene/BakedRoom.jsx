@@ -11,8 +11,9 @@ const base = import.meta.env.BASE_URL
 const url = (file) => `${base}studio/${ROOM_ID}/${file}` // each mood's bake in its own folder
 const small = window.matchMedia('(max-width: 820px)').matches
 const size = small ? '-2k' : ''
-// Blender's view exposure (lookdev_spacious.py) is applied here, so the room matches the renders.
-const EXPOSURE = 2 ** (ROOM_ID === 'spacious-cream' ? 0.8 : 1.0)
+// Blender's view exposure (lookdev_spacious.py) is applied here, so the room matches the renders;
+// the cream room is shown 10 % darker than its render.
+const EXPOSURE = ROOM_ID === 'spacious-cream' ? 2 ** 0.8 * 0.9 : 2 ** 1.0
 const WARM_LEVEL = ROOM_ID === 'spacious-cream' ? 0.88 : 1 // the cream room's warm theme, a touch softer than the bake
 const GLOW = 0.15 * EXPOSURE // Blender emission strength → web HDR colour that blooms
 

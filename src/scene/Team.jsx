@@ -49,7 +49,12 @@ function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props 
       if (!o.isMesh) return
       o.castShadow = o.receiveShadow = true
       o.frustumCulled = false // a bind-pose bounding box cannot represent a seated skinned character
-      o.material.roughness = Math.max(o.material.roughness, 0.75) // matte clay skin and knitwear
+      // Matte clay skin and knitwear, as in the reference renders. Meshy's roughness maps are glossy (about 0.6) and
+      // the factor only scales them, so the map goes; the normal map is softened so the knit folds don't catch the
+      // live lights as white streaks. Metalness shares that texture and is zero anyway.
+      Object.assign(o.material, { roughnessMap: null, metalnessMap: null, roughness: 0.85, metalness: 0 })
+      if (o.material.normalMap) o.material.normalScale.setScalar(0.6)
+      o.material.needsUpdate = true
     })
     const clip = (name) => animations.find((a) => a.name === name)
     const typing = clip('TypingIdle')

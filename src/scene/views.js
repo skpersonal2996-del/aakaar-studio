@@ -25,7 +25,7 @@ const seat = (person, rotation, chair, chairRotation, laptop, laptopRotation, la
   ({ person, rotation, chair, chairRotation, laptop, laptopRotation, laptopScale })
 export const SEATS = {
   classic: {
-    developer: seat([-1.33, 0, 0.902], 1.222, [-1.359, 0, 0.892], 1.222, [-0.924, 0.765, 1.05], -1.92, 1.15),
+    developer: seat([-1.343, 0, 0.897], 1.222, [-1.372, 0, 0.887], 1.222, [-0.924, 0.765, 1.05], -1.92, 1.15),
     designer: seat([1.75, 0, 0.625], -1.222, [1.778, 0, 0.615], -1.222, [1.324, 0.765, 0.78], 1.92, 1.15),
   },
   chibi: {

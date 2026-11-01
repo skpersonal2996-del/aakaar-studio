@@ -256,7 +256,10 @@ def target(name, size, float_buffer):
 
 
 scene.render.bake.use_selected_to_active = False
-scene.render.bake.margin = 12; scene.render.bake.margin_type = 'EXTEND'
+# Each object's margin is written over whatever lies beside its islands, including another object's islands
+# (the room, the desk top and the props bake into one atlas), so it stays within half the gap between parts.
+# optimize-room.mjs fills the remaining gaps before the web textures are mipmapped.
+scene.render.bake.margin = 3; scene.render.bake.margin_type = 'EXTEND'
 scene.render.bake.target = 'IMAGE_TEXTURES'
 bpy.ops.object.select_all(action='DESELECT')
 for o in lit: o.select_set(True)
