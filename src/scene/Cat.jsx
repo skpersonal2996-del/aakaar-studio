@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { useStore } from '../store'
 
 // The studio cat: Meshy's Puszek (CC0, by MrDavKot) with its quadruped walk, prepared by
 // blender/prepare_cat.py. It strolls a loop around the desk — up the bookshelf side, past the arc lamp and the
@@ -16,12 +17,14 @@ const PATH = new THREE.CatmullRomCurve3(
   'centripetal',
 )
 const LOOP = PATH.getLength()
+const START = 0.502 // back right by the corner plant: it walks down the window side, then across the front
 
 export function Cat() {
   const { scene, animations } = useGLTF(url, false, true)
   const ref = useRef()
   const mixer = useMemo(() => new THREE.AnimationMixer(scene), [scene])
-  const walk = useRef({ at: 0.06, pace: 1, rest: 0, next: 9 })
+  const walk = useRef({ at: START, pace: 0, rest: 0, next: 12 })
+  const entered = useStore((s) => s.entered)
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
   // Scale to a cat's length and stand the paws on the floor. Meshy's armature carries a 0.01 scale, so the
   // posed skinned mesh is measured in the cat's own frame (Box3.setFromObject misreads skinned meshes).
@@ -54,13 +57,13 @@ export function Cat() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1)
     const w = walk.current
-    w.next -= dt
+    if (entered) w.next -= dt
     if (w.rest > 0) w.rest -= dt
     else if (w.next <= 0) {
       w.rest = 2.5 + Math.random() * 3
       w.next = 12 + Math.random() * 14
     }
-    const target = reduced.matches || w.rest > 0 ? 0 : 1
+    const target = !entered || reduced.matches || w.rest > 0 ? 0 : 1 // waits at its start until the visitor steps in
     w.pace += (target - w.pace) * (1 - Math.exp(-dt * 4))
     mixer.timeScale = w.pace
     mixer.update(dt)

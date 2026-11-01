@@ -19,15 +19,23 @@ const PROP = { chair: `${base}studio/office-chair.glb`, laptop: `${base}studio/l
 // person says hi (blender/seat_meshy_character.py). The legs keep the typing clip, so they stay seated.
 const UPPER = new Set(['Spine', 'Spine01', 'Spine02', 'neck', 'Head', ...['Left', 'Right'].flatMap((side) =>
   ['Shoulder', 'Arm', 'ForeArm', 'Hand', 'Fingers1', 'Fingers2'].map((b) => side + b))])
+// The chibi rigs type with their heads level, looking over the laptops; this tilt (radians, about the
+// character's own left-right axis) bows the head and neck towards the screen. It eases off while they wave.
+const HEAD_TILT = { chibi: 0.3, classic: 0 }
+const TILT_SHARE = [['neck', 0.3], ['Head', 0.7]]
+const UP = new THREE.Vector3(0, 1, 0)
 const bone = (track) => track.name.split('.')[0]
 const only = (clip, keep, name) => new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => keep(bone(t))))
 
 // A seated character from the Meshy rigs: an eight-second typing loop, and a short wave on hover.
-function SeatedPerson({ model, intro, peekId, phase = 0, ...props }) {
+function SeatedPerson({ model, intro, peekId, phase = 0, headTilt = 0, ...props }) {
   const { scene, animations } = useGLTF(model, false, true)
   const actor = useMemo(() => clone(scene), [scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
   const actions = useRef({})
+  const tilt = useRef(1)
+  const neckBones = useMemo(() => TILT_SHARE.map(([name, share]) => [actor.getObjectByName(name), share]).filter(([b]) => b), [actor])
+  const tmp = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), axis: new THREE.Vector3() }), [])
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
   const [hover, setHover] = useState(false)
   const active = useStore((s) => s.active)
@@ -79,7 +87,19 @@ function SeatedPerson({ model, intro, peekId, phase = 0, ...props }) {
   }
 
   useFrame((_, delta) => {
-    if (!reduced.matches) mixer.update(Math.min(delta, 0.05))
+    mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05)) // re-poses every frame, so the tilt never accumulates
+    if (!headTilt) return
+    const waving = actions.current.wave?.isRunning()
+    tilt.current += ((waving ? 0 : 1) - tilt.current) * (1 - Math.exp(-Math.min(delta, 0.1) * 6))
+    actor.getWorldQuaternion(tmp.p)
+    tmp.axis.set(0, 0, 1).applyQuaternion(tmp.p).cross(UP).normalize() // the rigs' +z points behind them, so this pitches down
+    for (const [b, share] of neckBones) {
+      // Rotate about a world axis: local' = parent⁻¹ · q · parent · local
+      b.parent.getWorldQuaternion(tmp.p)
+      tmp.q.setFromAxisAngle(tmp.axis, headTilt * share * tilt.current)
+      tmp.d.copy(tmp.p).invert().multiply(tmp.q).multiply(tmp.p)
+      b.quaternion.premultiply(tmp.d)
+    }
   })
 
   return <group {...props} userData={{ studioActor: peekId }}
@@ -112,7 +132,8 @@ function Seat({ who, cast, intro, phase }) {
   const s = SEATS[cast][who]
   return (
     <>
-      <SeatedPerson model={url(MODELS[cast][who])} intro={intro} peekId={who} phase={phase} position={s.person} rotation-y={s.rotation} />
+      <SeatedPerson model={url(MODELS[cast][who])} intro={intro} peekId={who} phase={phase} headTilt={HEAD_TILT[cast]}
+        position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
       <Prop src={PROP.laptop} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />
     </>
