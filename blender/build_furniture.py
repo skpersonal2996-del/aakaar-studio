@@ -134,7 +134,10 @@ def finish(root):
 # --- furniture -------------------------------------------------------------------------------
 
 
-def desk(x, w=2.7, d=1.35, h=.765):
+DESK_TOP = .68  # lowered from .765: the seated characters are short, and at .765 their arms reached up to the keys
+
+
+def desk(x, w=2.7, d=1.35, h=DESK_TOP):
     """Lacquered walnut top on a black square-tube frame (03-wood-and-black-metal-desk)."""
     r = piece('Desk · walnut and steel', x)
     t, leg = .045, .05
@@ -291,7 +294,7 @@ shelf_unit(9.0, .6, .35, 2.2, 6, 'Shelf · tall divider')
 # Replaces the room's open shelf; shelf tops match the props already standing on it.
 shelf_unit(19.0, .9, .34, 2.25, 5, 'Open shelf · walnut', levels=[.1, .62, 1.13, 1.65, 2.17])
 p = pendant(10.0, drop=1.45); p.location.z = 2.9  # drum about 1.9 m above the floor under a 3.6 m ceiling
-p = pendant(10.4, drop=1.95, name='Pendant · black drum · long'); p.location.z = 3.4  # the same under a 4.2 m ceiling
+p = pendant(10.4, drop=1.7, name='Pendant · black drum · long'); p.location.z = 3.4  # under a 4.2 m ceiling, clear of the sign
 floor_lamp(10.9)
 laptop(11.8)
 rug(13.0)

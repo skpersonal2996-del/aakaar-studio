@@ -22,7 +22,12 @@ const lights = [
   // low sunset through the window, faint moonlight at night
   { type: 'dir', position: [WINDOW.x + 1.5, 2.4, WINDOW.z], warm: L('#ff9d5c', 0.9), night: L('#6a80ff', 0.35) },
   // the candles on the desk between them: a flickering amber glow, strongest at night
-  { type: 'point', position: [dx + 0.05, 0.95, dz - 0.15], distance: 2.5, flicker: true, warm: L('#ffb070', 0.4), night: L('#ff7a30', 1.6) },
+  { type: 'point', position: [dx + 0.05, 0.95, dz - 0.15], distance: 2.5, flicker: true, warm: L('#ffb070', 0.3), night: L('#ff7a30', 0.9) },
+  // a soft key light on the faces from the front and above, so the characters have shape rather than flat light
+  { type: 'spot', position: [dx + 0.2, 2.6, dz + 2.6], target: [dx, 1.05, dz], angle: 0.75, warm: L('#ffd9b8', 7), night: L('#e8b8d8', 3.5) },
+  // rim lights behind each of them, outlining hair and shoulders against the dark back wall
+  { type: 'spot', position: [-1.5, 2.3, dz - 1.7], target: [-1.25, 1.05, dz], angle: 0.6, warm: L('#ffd0a0', 6), night: L('#ffb0d0', 4) },
+  { type: 'spot', position: [1.9, 2.3, dz - 1.9], target: [1.65, 1.05, dz - 0.25], angle: 0.6, warm: L('#ffd0a0', 6), night: L('#ffb0d0', 4) },
   // soft bounce from the open front so faces are never black
   { type: 'point', position: [dx + 0.3, 2.2, dz + 3.4], distance: 9, warm: L('#ffd2a8', 3.5), night: L('#c99a90', 3) },
 ]

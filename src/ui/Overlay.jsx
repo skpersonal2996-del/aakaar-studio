@@ -120,7 +120,7 @@ export function Overlay({ ready }) {
           <span className="chip__led" />
           <span className="chip__label">{cast === 'chibi' ? 'Chibi' : 'Classic'}</span>
         </button>
-        <button
+        {ROOMS.length > 1 && <button
           className="chip chip--cast"
           onClick={() => { // each room bakes its own scene, so switching reloads the page
             const next = ROOMS[(ROOMS.indexOf(ROOM_ID) + 1) % ROOMS.length]
@@ -131,7 +131,7 @@ export function Overlay({ ready }) {
           title="Switch room">
           <span className="chip__led" />
           <span className="chip__label">{ROOM_LABELS[ROOM_ID]}</span>
-        </button>
+        </button>}
         <button className={`chip chip--sound ${music ? 'is-on' : ''}`} onClick={() => {
             if (!music) startMusic()
             toggleMusic()

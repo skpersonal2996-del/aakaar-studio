@@ -99,84 +99,12 @@ function glossyMaterial({ map, warm, nightMap, scales, tint }) {
 // mesh with an albedo atlas on the lightmap UVs; 'Textured · props' keeps each photo, book cover and
 // CC0 prop texture on uv0 with the lightmap on uv1; the glossy desk top does the same with its walnut
 // grain; lamps, LEDs and screens become HDR glow colours.
-// TEMPORARY, until the rooms are re-baked: the first site's desk pot and its black succulent are removed in
-// blender/assemble_cozy_room.py, but the current bakes still contain them (and the candles that stood in the pot).
-// Their triangles are cut out here; delete this once the rooms are re-baked, or it would cut the new desk candles.
-const CUT = new THREE.Box3(new THREE.Vector3(-0.01, 0.75, 0.62), new THREE.Vector3(0.39, 1.15, 1.06))
-function cut(o) {
-  const g = o.geometry, pos = g.attributes.position, v = new THREE.Vector3()
-  const inside = (i) => CUT.containsPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld))
-  o.updateWorldMatrix(true, false)
-  if (!g.index) return inside(0) && (o.visible = false)
-  const index = g.index.array, keep = []
-  for (let i = 0; i < index.length; i += 3) {
-    if (!(inside(index[i]) && inside(index[i + 1]) && inside(index[i + 2]))) keep.push(index[i], index[i + 1], index[i + 2])
-  }
-  if (keep.length < index.length) g.setIndex(keep)
-}
-
-// TEMPORARY as well: the pot's shadow is baked into the desk top's light as a dark ring. Where the desk top maps into
-// the lightmaps is found from one of its upward-facing triangles, and the ring's texels are filled in smoothly from
-// the light around them (a few hundred relaxation passes over a small patch), in both lightmaps.
-const RING = { x: 0.2, z: 0.85, radius: 0.3 }
-function eraseRing(desk, textures) {
-  const g = desk.geometry, pos = g.attributes.position, uv = g.attributes.uv1
-  if (!uv) return
-  desk.updateWorldMatrix(true, false)
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3()
-  let map = null
-  for (let i = 0; i < pos.count && !map; i += 3) {
-    a.fromBufferAttribute(pos, i).applyMatrix4(desk.matrixWorld)
-    b.fromBufferAttribute(pos, i + 1).applyMatrix4(desk.matrixWorld)
-    c.fromBufferAttribute(pos, i + 2).applyMatrix4(desk.matrixWorld)
-    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize()
-    if (Math.abs(n.y) < 0.95 || a.y < 0.755) continue // the top surface (its underside has its own patch)
-    // affine map from world (x, z) to uv through the corners of the top triangle under the ring's centre
-    const [x0, z0, x1, z1, x2, z2] = [a.x, a.z, b.x, b.z, c.x, c.z]
-    const det = (x1 - x0) * (z2 - z0) - (x2 - x0) * (z1 - z0)
-    const s0 = ((RING.x - x0) * (z2 - z0) - (x2 - x0) * (RING.z - z0)) / det
-    const t0 = ((x1 - x0) * (RING.z - z0) - (RING.x - x0) * (z1 - z0)) / det
-    if (s0 < 0 || t0 < 0 || s0 + t0 > 1) continue
-    const u0 = uv.getX(i), v0 = uv.getY(i), du1 = uv.getX(i + 1) - u0, dv1 = uv.getY(i + 1) - v0
-    const du2 = uv.getX(i + 2) - u0, dv2 = uv.getY(i + 2) - v0
-    map = (x, z) => {
-      const s = ((x - x0) * (z2 - z0) - (x2 - x0) * (z - z0)) / det, t = ((x1 - x0) * (z - z0) - (x - x0) * (z1 - z0)) / det
-      return [u0 + s * du1 + t * du2, v0 + s * dv1 + t * dv2]
-    }
-  }
-  if (!map) return
-  const [cu, cv] = map(RING.x, RING.z), [eu, ev] = map(RING.x + RING.radius, RING.z), [fu, fv] = map(RING.x, RING.z + RING.radius)
-  const done = new Map() // the clones share their originals' images: patch each image once
-  for (const texture of textures) {
-    const image = texture.image, size = image.width
-    if (done.has(image)) { texture.image = done.get(image); texture.needsUpdate = true; continue }
-    const canvas = document.createElement('canvas'); canvas.width = canvas.height = size
-    const ctx = canvas.getContext('2d', { willReadFrequently: true }); ctx.drawImage(image, 0, 0)
-    const r = Math.ceil(Math.max(Math.hypot(eu - cu, ev - cv), Math.hypot(fu - cu, fv - cv)) * size) + 2
-    const x0 = Math.max(0, Math.floor(cu * size) - r - 2), y0 = Math.max(0, Math.floor(cv * size) - r - 2), w = 2 * r + 5
-    const patch = ctx.getImageData(x0, y0, w, w), d = patch.data
-    const inside = (x, y) => Math.hypot(x0 + x + 0.5 - cu * size, y0 + y + 0.5 - cv * size) < r - 1
-    for (let pass = 0; pass < 400; pass++) {
-      for (let y = 1; y < w - 1; y++) for (let x = 1; x < w - 1; x++) {
-        if (!inside(x, y)) continue
-        const i = (y * w + x) * 4
-        for (let k = 0; k < 3; k++) d[i + k] = (d[i - 4 + k] + d[i + 4 + k] + d[i - w * 4 + k] + d[i + w * 4 + k]) / 4
-      }
-    }
-    ctx.putImageData(patch, x0, y0)
-    done.set(image, canvas)
-    texture.image = canvas
-    texture.needsUpdate = true
-  }
-}
-
 function convert(scene, albedo, warm, nightMap) {
   if (scene.userData.baked) return
   const second = { warm: warm.clone(), night: nightMap.clone() }
   second.warm.channel = second.night.channel = 1
   scene.traverse((o) => {
     if (!o.isMesh) return
-    cut(o)
     const old = o.material
     const { web_emissive, web_emissive_night, web_light_scale = 1, web_light_scale_night = 1, web_cutout, web_gloss, web_tint } = old.userData
     const scales = [web_light_scale * WARM_LEVEL, web_light_scale_night]
@@ -205,7 +133,6 @@ function convert(scene, albedo, warm, nightMap) {
       o.geometry = o.geometry.toNonIndexed()
       o.geometry.computeVertexNormals()
       o.material = glossyMaterial({ map: old.map, warm: second.warm, nightMap: second.night, scales, tint: web_tint })
-      eraseRing(o, [warm, nightMap, second.warm, second.night])
     } else if (o.name.startsWith('Textured')) {
       if (old.map) old.map.anisotropy = 8
       o.material = bakedMaterial({ map: old.map, warm: second.warm, nightMap: second.night, scales, cutout: web_cutout })

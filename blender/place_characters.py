@@ -46,7 +46,7 @@ for name, seat in zip(names, ('vinay', 'shruti')):
     f = FACING[seat]
     laptop, chair = O[f'Laptop · {seat.title()}'], O[f'Office chair · {seat.title()}']
     laptop.scale *= meta['laptop_scale']            # sized to the cast's hands (seat_meshy_character.py)
-    laptop.location = (DESK_EDGE[seat], SEAT_Y[seat], .765)
+    laptop.location = (DESK_EDGE[seat], SEAT_Y[seat], .68)
     bpy.context.view_layer.update()
     pts = [m.matrix_world @ Vector(c) for m in tree(laptop) if m.type == 'MESH' for c in m.bound_box]
     near = min(p.x for p in pts) if f == 1 else max(p.x for p in pts)
@@ -87,11 +87,11 @@ for name, seat in zip(names, ('vinay', 'shruti')):
     ev = body.evaluated_get(graph).data; mw = body.matrix_world; f = FACING[seat]
     names_of = {g.index: g.name for g in body.vertex_groups}
     part = lambda v, name: v.groups and name in names_of[max(v.groups, key=lambda g: g.weight).group]
-    belly = [f * (mw @ v.co).x for v, src in zip(ev.vertices, body.data.vertices) if .62 < (mw @ v.co).z < .765 and part(src, 'Spine')]
+    belly = [f * (mw @ v.co).x for v, src in zip(ev.vertices, body.data.vertices) if .62 < (mw @ v.co).z < .68 and part(src, 'Spine')]
     arms = [(mw @ v.co).z for v, src in zip(ev.vertices, body.data.vertices)
             if f * (mw @ v.co).x > f * DESK_EDGE[seat] and part(src, 'Arm')]  # forearms over the desk
     print('CLEARANCE', name, 'belly', round(f * DESK_EDGE[seat] - max(belly), 3), 'm; forearms sink',
-          round(max(0, .765 - min(arms)), 4), 'm into the desk', flush=True)
+          round(max(0, .68 - min(arms)), 4), 'm into the desk', flush=True)
 (ROOT / f'generated/seats-{variant}.json').write_text(json.dumps(seats, indent=2))
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / f'{prefix}{variant}.blend'))
 print('PLACED', variant, json.dumps(seats), flush=True)

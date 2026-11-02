@@ -40,8 +40,10 @@ def kelvin(k):
     return tuple(((min(max(c, 0), 255) / 255) ** 2.2) for c in (r, g, b))
 
 
-def pbr(name, asset, metres, tint, rough=1.0, sheen=0.0):
-    """Poly Haven texture set, box-projected in object space (the room's planes have no useful UVs)."""
+def pbr(name, asset, metres, tint, rough=1.0, sheen=0.0, detail=1.0, bump=1.0):
+    """Poly Haven texture set, box-projected in object space (the room's planes have no useful UVs).
+    detail < 1 flattens the colour texture towards its average (so plaster reads as smooth limewash rather than
+    sandpaper, and linen as cloth rather than static); bump scales the normal map."""
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; p = nt.nodes['Principled BSDF']
     mapping = nt.nodes.new('ShaderNodeMapping'); mapping.inputs['Scale'].default_value = (1 / metres,) * 3
     nt.links.new(nt.nodes.new('ShaderNodeTexCoord').outputs['Object'], mapping.inputs['Vector'])
@@ -53,10 +55,20 @@ def pbr(name, asset, metres, tint, rough=1.0, sheen=0.0):
         nt.links.new(mapping.outputs['Vector'], n.inputs['Vector']); return n
     mix = nt.nodes.new('ShaderNodeMix'); mix.data_type = 'RGBA'; mix.blend_type = 'MULTIPLY'
     mix.inputs['Factor'].default_value = 1; mix.inputs['B'].default_value = (*tint, 1)
-    nt.links.new(image('diff', True).outputs['Color'], mix.inputs['A']); nt.links.new(mix.outputs['Result'], p.inputs['Base Color'])
+    diff = image('diff', True)
+    if detail < 1:
+        import numpy as np
+        mean = np.array(diff.image.pixels[:], dtype=np.float32).reshape(-1, 4)[::97, :3].mean(0)
+        flat = nt.nodes.new('ShaderNodeMix'); flat.data_type = 'RGBA'; flat.inputs['Factor'].default_value = 1 - detail
+        nt.links.new(diff.outputs['Color'], flat.inputs['A']); flat.inputs['B'].default_value = (*mean, 1)
+        nt.links.new(flat.outputs['Result'], mix.inputs['A'])
+    else:
+        nt.links.new(diff.outputs['Color'], mix.inputs['A'])
+    nt.links.new(mix.outputs['Result'], p.inputs['Base Color'])
     k = nt.nodes.new('ShaderNodeMath'); k.operation = 'MULTIPLY'; k.inputs[1].default_value = rough
     nt.links.new(image('rough', False).outputs['Color'], k.inputs[0]); nt.links.new(k.outputs[0], p.inputs['Roughness'])
     nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(image('nor_gl', False).outputs['Color'], nm.inputs['Color'])
+    nm.inputs['Strength'].default_value = bump
     nt.links.new(nm.outputs[0], p.inputs['Normal'])
     if sheen: p.inputs['Sheen Weight'].default_value = sheen
     return m
@@ -109,9 +121,12 @@ view = bpy.context.object; view.name = 'City view'; view.scale = (2.5, 1.9, 1); 
 
 # --- surfaces: plaster walls in the mood's colour, linen curtains, near-black ceiling ---
 wall = LOOK['wall']
-surface(['Wall · back', 'Wall · left'], pbr('Plaster · walls', 'grey_plaster', 3.0, wall, rough=1.2))
-surface(['Wall · right'], pbr('Plaster · right wall', 'grey_plaster', 3.0, tuple(c * LOOK['right'] for c in wall), rough=1.2))
-linen = pbr('Linen · curtains', 'rough_linen', .5, (1.25, 1.0, .78), rough=1.1, sheen=.6)
+surface(['Wall · back', 'Wall · left'], pbr('Plaster · walls', 'grey_plaster', 3.0, wall, rough=1.2, detail=.35, bump=.5))
+surface(['Wall · right'], pbr('Plaster · right wall', 'grey_plaster', 3.0, tuple(c * LOOK['right'] for c in wall), rough=1.2,
+                              detail=.35, bump=.5))
+linen = pbr('Linen · curtains', 'rough_linen', .5, (1.25, 1.0, .78), rough=1.1, sheen=.6, detail=.3, bump=.4)
+# the lounge rug's own texture is low-resolution and blurs: a soft woven cream instead
+surface(['Rug · lounge'], pbr('Wool · lounge rug', 'rough_linen', .25, (1.15, 1.02, .86), rough=1.2, sheen=.4, detail=.55, bump=.6))
 for n in ('Curtain · back', 'Curtain · left'):
     for o in O[n].children_recursive if n in O else []:
         if o.type == 'MESH' and max(o.dimensions) > 1:  # the fabric, not the rod
@@ -183,17 +198,17 @@ def surface_z(x, y, z=1.9):
     return loc.z if hit else 0.0
 
 
-CANDLES = [  # cluster centre (x, y), then (radius, height) per candle
-    ((1.15, 4.6), [(.035, .16), (.03, .1), (.028, .07)]),  # credenza
-    ((4.35, 4.65), [(.035, .14), (.03, .09)]),  # ID cabinet
-    ((-3.95, 3.0), [(.04, .12), (.032, .08), (.03, .05)]),  # lounge coffee table
-    ((.25, -.75), [(.03, .09), (.026, .06)]),  # desk
-    ((5.55, .9), [(.07, .45), (.06, .3), (.055, .2), (.05, .14)]),  # floor under the window
-    ((-5.35, 1.4), [(.07, .4), (.06, .26), (.05, .16)]),  # floor by the bookshelf
+CANDLES = [  # cluster centre (x, y), the surface height (None: found by a ray down), then (radius, height) per candle
+    ((1.15, 4.6, None), [(.035, .16), (.03, .1), (.028, .07)]),  # credenza
+    ((4.8, 4.65, .71), [(.035, .14), (.03, .09)]),  # ID cabinet, clear of its lamp
+    ((-3.95, 3.0, None), [(.04, .12), (.032, .08), (.03, .05)]),  # lounge coffee table
+    ((.25, -.82, .68), [(.03, .09), (.026, .06)]),  # desk (build_furniture.py DESK_TOP), where the old pot stood
+    ((5.55, .9, 0), [(.07, .45), (.06, .3), (.055, .2), (.05, .14)]),  # floor under the window
+    ((-5.3, 2.7, 0), [(.07, .4), (.06, .26), (.05, .16)]),  # floor by the bookshelf, clear of the lounge plant
 ]
 n = 0
-for (cx, cy), sizes in CANDLES:
-    z0 = surface_z(cx, cy)
+for (cx, cy, z0), sizes in CANDLES:
+    z0 = surface_z(cx, cy) if z0 is None else z0
     for i, (r, h) in enumerate(sizes):
         a, d = i * 2.4, (0 if i == 0 else sizes[0][0] + r + .015)
         x, y = cx + d * math.cos(a), cy + d * math.sin(a)
@@ -206,6 +221,63 @@ for (cx, cy), sizes in CANDLES:
             dressing.objects.link(o)
         light(f'Candle {n}', 'POINT', (x, y, z0 + h + .03), 2.5, 1800, .01)
         n += 1
+
+# --- ID wall moodboard: around the two ID cards, prints of our projects, wireframe sketches and sticky notes ---
+# The pegboard's face is at y 4.885 (x 4.08-5.62, z 1.61-2.79); the cards hang at x 4.41-4.69 and 5.02-5.30, z 1.94-2.39.
+import numpy as np
+for o in [o for o in dressing.objects if o.name.startswith('Moodboard')]: bpy.data.objects.remove(o, do_unlink=True)
+
+
+def card(name, x, z, w, h, material, tilt=0.0):
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x, 4.879, z), rotation=(math.pi / 2, tilt, 0))
+    o = bpy.context.object; o.name = f'Moodboard · {name}'; o.scale = (w, h, 1); o.data.materials.append(material)
+    for c in o.users_collection: c.objects.unlink(o)
+    dressing.objects.link(o)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=6, radius=.006, location=(x, 4.873, z + h / 2 - .015))
+    pin = bpy.context.object; pin.name = f'Moodboard · {name} · pin'; pin.data.materials.append(PIN)
+    for c in pin.users_collection: c.objects.unlink(pin)
+    dressing.objects.link(pin)
+
+
+def flat(name, rgb, rough=.7):
+    m = M.get(name) or M.new(name); m.use_nodes = True; p = m.node_tree.nodes['Principled BSDF']
+    p.inputs['Base Color'].default_value = (*rgb, 1); p.inputs['Roughness'].default_value = rough
+    return m
+
+
+def picture(name, image):
+    m = M.get(name) or M.new(name); m.use_nodes = True; nt = m.node_tree; p = nt.nodes['Principled BSDF']
+    tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = image
+    nt.links.new(tex.outputs['Color'], p.inputs['Base Color']); p.inputs['Roughness'].default_value = .6
+    return m
+
+
+def sketch(name, seed):
+    """A pencil wireframe on paper, drawn into a small image (no asset needed)."""
+    w, h = 160, 200
+    px = np.ones((h, w, 4), dtype=np.float32); px[..., :3] = (.96, .95, .92)
+    rng = np.random.default_rng(seed)
+    def box(x0, y0, x1, y1, shade=.45):
+        px[y0:y1, x0:x0 + 2, :3] = shade; px[y0:y1, x1 - 2:x1, :3] = shade
+        px[y0:y0 + 2, x0:x1, :3] = shade; px[y1 - 2:y1, x0:x1, :3] = shade
+    box(14, 14, w - 14, h - 14, .35)
+    box(24, h - 70, w - 24, h - 26)
+    for r in range(4): px[40 + r * 16:43 + r * 16, 24:24 + int(rng.uniform(50, w - 50)), :3] = .5
+    box(24, 110, 70, 130, .55); box(80, 110, w - 24, 130, .55)
+    img = bpy.data.images.new(name, w, h, alpha=False); img.pixels[:] = px[::-1].ravel(); img.pack()
+    return img
+
+
+PIN = flat('Moodboard pin', (.85, .2, .35), .3)
+prints = ROOT.parent / 'public/projects'
+for name, x, z, w, h, tilt in (('bridge', 4.24, 2.58, .27, .18, .03), ('primechat', 5.46, 2.6, .27, .165, -.025),
+                               ('docfit', 4.86, 1.76, .29, .19, .01)):
+    card(f'print {name}', x, z, w, h, picture(f'Moodboard print · {name}', bpy.data.images.load(str(prints / f'{name}.webp'))), tilt)
+for i, (x, z, tilt) in enumerate(((5.47, 1.78, -.05), (4.22, 1.8, .06))):
+    card(f'sketch {i}', x, z, .15, .19, picture(f'Moodboard sketch {i}', sketch(f'Moodboard sketch {i}', i)), tilt)
+for i, (x, z, rgb, tilt) in enumerate(((4.2, 2.17, (1, .62, .72), .08), (5.47, 2.2, (.66, .9, .78), -.06),
+                                        (4.86, 2.62, (1, .87, .45), .04), (5.2, 1.66, (1, .87, .45), -.1))):
+    card(f'note {i}', x, z, .085, .085, flat(f'Sticky note {i}', rgb, .8), tilt)
 
 world = scene.world; bg = world.node_tree.nodes['Background']
 bg.inputs[0].default_value = (.03, .022, .016, 1); bg.inputs[1].default_value = LOOK['world']

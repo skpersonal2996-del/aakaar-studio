@@ -88,7 +88,7 @@ export function Studio({ onReady }) {
       <CameraRig />
       <Lights />
       {/* the characters reflect the baked room, captured once from the middle of the desk */}
-      <Environment resolution={256} environmentIntensity={0.55} frames={1}>
+      <Environment resolution={512} environmentIntensity={0.55} frames={1}>
         <RoomReflection position={[-DESK[0], -1.1, -DESK[2]]} />
       </Environment>
       <BakedRoom />

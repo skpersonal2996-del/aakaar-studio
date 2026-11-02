@@ -35,7 +35,7 @@ TOP = 3.12                                          # fascia and cap above the t
 POSTS = [Y0 + SIDE / 2, -3.15, -1.85, -.55, Y1 - SIDE / 2]  # end panels sit inside the footprint
 BAYS = [(a + SIDE / 2, b - SIDE / 2) for a, b in zip(POSTS, POSTS[1:])]
 RAIL_X, RAIL_Z = -5.54, 3.0
-LED_STRENGTH = 60
+LED_STRENGTH = 36  # bright enough to read as LEDs without blowing out the book tops below them
 
 # --- materials ---------------------------------------------------------------------------------
 
@@ -563,6 +563,7 @@ PLAN = [
     [[('decor', 'vase'), ('up', 8)], [('up', 8), ('decor', 'fern')], [('stack', 3, None), ('up', 7)], [('up', 6), ('stack', 2, None)]],
     [[('up', 7), ('stack', 2, None)], [('decor', 'fern'), ('up', 7)], [('up', 8)], [('stack', 3, None), ('up', 6)]],
 ]
+FILL = 1.4  # upright rows a little fuller than the plan's counts: the shelves read sparse from the room
 DEPTH_MID = (INNER + FRONT) / 2
 FORWARD = {'fern': .07, 'lamp': .05, 'camera': .06, 'car': .07, 'encyclopedia': .045}  # how far in front of mid-depth
 
@@ -577,6 +578,7 @@ for level, bays in enumerate(PLAN):
         for i, item in enumerate(items):
             if item[0] == 'up':
                 ids, extra = (item[1], item[2]) if isinstance(item[1], list) else ([], item[1])
+                extra = round(extra * FILL)
                 before = extra // 2
                 row = [plain_book(level == 0) for _ in range(before)] + [titled_book(k) for k in ids] + \
                       [plain_book(level == 0) for _ in range(extra - before)]

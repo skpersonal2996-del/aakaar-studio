@@ -2,7 +2,9 @@
 // 12 m wide (x -6..6), 10 m deep (z -5..5), 4.2 m tall, with the front wall left open for the camera.
 // It is baked in three moods, each in public/studio/<room>/; pick one with ?room=… (it is remembered).
 // Blender (x, y, z) = Three (x, -z, y).
-export const ROOMS = ['spacious-dark', 'spacious-warm', 'spacious-cream']
+// The dark and cream rooms (public/studio/spacious-dark, -cream) are hidden until they are re-baked with the lower desk
+// (build_furniture.py DESK_TOP); add them back here then. The first is the default.
+export const ROOMS = ['spacious-warm']
 export const ROOM_LABELS = { 'spacious-dark': 'Big · dark', 'spacious-warm': 'Big · warm', 'spacious-cream': 'Big · cream' }
 const asked = new URLSearchParams(window.location.search).get('room')
 const stored = (() => { try { return localStorage.getItem('room') } catch { return null } })()
@@ -25,12 +27,12 @@ const seat = (person, rotation, chair, chairRotation, laptop, laptopRotation, la
   ({ person, rotation, chair, chairRotation, laptop, laptopRotation, laptopScale })
 export const SEATS = {
   classic: {
-    developer: seat([-1.343, 0, 0.897], 1.222, [-1.372, 0, 0.887], 1.222, [-0.924, 0.765, 1.05], -1.92, 1.15),
-    designer: seat([1.75, 0, 0.625], -1.222, [1.778, 0, 0.615], -1.222, [1.324, 0.765, 0.78], 1.92, 1.15),
+    developer: seat([-1.275, 0, 0.922], 1.222, [-1.303, 0, 0.912], 1.222, [-0.924, 0.68, 1.05], -1.92, 1.15),
+    designer: seat([1.685, 0, 0.649], -1.222, [1.713, 0, 0.638], -1.222, [1.324, 0.68, 0.78], 1.92, 1.15),
   },
   chibi: {
-    developer: seat([-1.298, 0, 0.917], 1.222, [-1.326, 0, 0.906], 1.222, [-0.932, 0.765, 1.05], -1.92, 1.35),
-    designer: seat([1.702, 0, 0.645], -1.222, [1.73, 0, 0.635], -1.222, [1.332, 0.765, 0.78], 1.92, 1.35),
+    developer: seat([-1.326, 0, 0.932], 1.222, [-1.354, 0, 0.922], 1.222, [-1.002, 0.68, 1.05], -1.92, 1.35),
+    designer: seat([1.741, 0, 0.656], -1.222, [1.77, 0, 0.646], -1.222, [1.402, 0.68, 0.78], 1.92, 1.35),
   },
 }
 
@@ -56,12 +58,12 @@ export const PEEKS = {
 
 // Glowing markers, one per section; a 4th value is a size boost.
 export const HOTSPOTS = {
-  projects: [1.33, 1.22, 0.78],
+  projects: [1.72, 1.7, 0.66, 0.85], // above Shruti's head
   story: [-5.45, 3.35, 1.6], // bookshelf
-  services: [-0.93, 1.2, 1.05], // above Vinay's laptop
+  services: [-1.3, 1.7, 0.92, 0.85], // above Vinay's head
   process: [-3.95, 1.05, -3.0, 1.35], // over the coffee table
   about: [4.85, 3.12, -4.75], // founders' ID wall
-  contact: [-0.1, 1.0, 1.32],
+  contact: [-0.1, 0.92, 1.32],
 }
 
 // Invisible click targets over baked furniture: [centre, size] in Three coordinates.
@@ -69,7 +71,7 @@ export const HIT_BOXES = {
   story: [[-5.79, 1.5, 1.85], [0.4, 3.0, 5.2]],
   process: [[-4.0, 0.45, -3.2], [4.0, 0.9, 3.4]],
   about: [[4.85, 2.2, -4.88], [1.6, 1.3, 0.12]],
-  services: [[-0.93, 0.9, 1.05], [0.32, 0.28, 0.4]], // Vinay's laptop
-  projects: [[1.33, 0.9, 0.78], [0.32, 0.28, 0.4]], // Shruti's laptop
-  contact: [[-0.1, 0.79, 1.32], [0.14, 0.05, 0.22]], // phone on the desk
+  services: [[-0.93, 0.82, 1.05], [0.32, 0.28, 0.4]], // Vinay's laptop
+  projects: [[1.33, 0.82, 0.78], [0.32, 0.28, 0.4]], // Shruti's laptop
+  contact: [[-0.1, 0.705, 1.32], [0.14, 0.05, 0.22]], // phone on the desk
 }

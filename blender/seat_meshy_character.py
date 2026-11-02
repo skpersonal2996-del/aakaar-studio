@@ -21,13 +21,13 @@ args = sys.argv[sys.argv.index('--') + 1:]
 name, seat = args[0], args[1]
 scale = float(args[2]) if len(args) > 2 else 1.0
 wave_side = 'Right' if seat == 'vinay' else 'Left'  # the hand nearer the camera (see the wave below)
-HIP_Z, DESK_Z = .53, .765
+HIP_Z, DESK_Z = .53, .68  # build_furniture.py DESK_TOP
 # Laptop size for this cast (place_characters.py scales laptop.glb by it): the chibi hands are big for their
 # bodies, so their laptop is larger to keep the fingers on the keys.
 LAPTOP_SCALE = 1.35 if 'chibi' in name else 1.15
 # The laptop's near edge from the desk edge (round chibi bellies sit further back), and the wrists 3 cm
 # onto the laptop: the desk edge is DESK_BACK behind the wrists. place_characters.py reads both.
-LAPTOP_INSET = .07 if 'chibi' in name else .1
+LAPTOP_INSET = 0 if 'chibi' in name else .1  # flush with the edge for the chibis: their short arms put the round belly close to the hands
 DESK_BACK = LAPTOP_INSET + .03
 
 bpy.ops.wm.read_factory_settings(use_empty=True)

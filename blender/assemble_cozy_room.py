@@ -61,7 +61,8 @@ SHELF_LIB = ROOT / 'bookshelf-library.blend'
 if SPACIOUS: old += ['Plant · trailing'] + (['Bookshelf'] if SHELF_LIB.exists() else [])  # bamboo palm; the old bookshelf
 for n in old: remove(n)
 if SPACIOUS:  # the first site's low-poly desk pot and its near-black succulent: they look broken up close
-    for n in ['Mesh_234'] + [f'Mesh_{i}' for i in range(235, 247)]:
+    # and its plain bottle cylinders and box books (the Meshy book stack stands beside them)
+    for n in ['Mesh_234'] + [f'Mesh_{i}' for i in range(235, 247)] + ['Mesh_257', 'Mesh_259', 'Mesh_260', 'Mesh_263', 'Mesh_264', 'Mesh_265']:
         if n in O: bpy.data.objects.remove(O[n], do_unlink=True)
 # Shelf, credenza and cabinet bodies only: the books, lamps, plants and LED strips on them stay.
 for n in ['Mesh_83', 'Mesh_84', 'Mesh_85', 'Mesh_86', 'Mesh_446', 'Mesh_447', 'Mesh_448', 'Mesh_449', 'Mesh_450',
@@ -199,6 +200,21 @@ for i, top in enumerate((.62, 1.13, 1.65, 2.17)):
 # --- surfaces ---------------------------------------------------------------------------------
 with bpy.data.libraries.load(str(LIB), link=False) as (src, dst): dst.materials = ['Oak floor']
 O['Floor'].data.materials.clear(); O['Floor'].data.materials.append(dst.materials[0])
+
+# --- the desk top is lower than the first site's (build_furniture.py DESK_TOP): bring down what stands on it ---------
+DESK_DROP = .765 - .68
+on_desk = []
+for o in O:
+    if o.type != 'MESH' or o.name.startswith(('Desk ·', 'Top', 'Leg', 'Top rail', 'Foot rail', 'Apron', 'Stretcher')): continue
+    root = o
+    while root.parent: root = root.parent
+    if root.name.startswith('Desk ·'): continue
+    pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+    cx, cy, zmin = sum(p.x for p in pts) / 8, sum(p.y for p in pts) / 8, min(p.z for p in pts)
+    if .755 < zmin < .80 and -1.15 < cx < 1.55 and -1.6 < cy < -.2: on_desk.append(o)
+for o in on_desk:
+    m = o.matrix_world.copy(); m.translation.z -= DESK_DROP; o.matrix_world = m
+print('ASSEMBLE desk props lowered', len(on_desk), flush=True)
 
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / ('studio-spacious-assembled.blend' if SPACIOUS else 'studio-assembled.blend')))
 print('ASSEMBLED', len(col.all_objects), flush=True)
