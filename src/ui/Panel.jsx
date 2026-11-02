@@ -54,10 +54,15 @@ function useVisitCursor() {
   return dot
 }
 
+// The list: one compact card per project. Opening one widens the panel into its page, and the camera
+// moves in on Shruti's laptop, which shows it; hovering a card puts it on her screen first.
 function Projects() {
   const cursor = useVisitCursor()
+  const showcase = useStore((s) => s.showcase)
+  const setShowcase = useStore((s) => s.setShowcase)
+  const setPreview = useStore((s) => s.setPreview)
   return (
-    <div className="list">
+    <>
       {/* on the body, since the sliding panel's transform would offset a fixed element */}
       {createPortal(
         <span className="visit-cursor mono" ref={cursor} aria-hidden>
@@ -65,36 +70,69 @@ function Projects() {
         </span>,
         document.body,
       )}
-      {PROJECTS.map((p, i) => {
-        // live projects open their own site (with the Visit cursor); ones without a url show "Coming soon"
-        const Card = p.url ? 'a' : 'article'
-        const link = p.url ? { href: p.url, target: '_blank', rel: 'noreferrer' } : { 'aria-disabled': true }
-        return (
-          <Card key={p.name} className={`project ${p.url ? 'project--live' : 'project--soon'}`} {...link}>
-            <span className="project__label mono">
-              0{i + 1} / {p.name}
-            </span>
-            <h3 className="project__title">{p.title}</h3>
-            <div className="project__thumb">
-              <img src={p.image} alt={p.alt} loading="lazy" />
-              {!p.url && <span className="project__cta mono">Coming soon</span>}
-            </div>
-            <div className="project__tags">
-              {p.tags.map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-            </div>
-            <p>{p.text}</p>
-            {p.impact && (
-              <div className="project__impact">
-                <span className="mono">The impact</span>
-                <p>{p.impact}</p>
-              </div>
-            )}
-          </Card>
-        )
-      })}
-    </div>
+      {showcase === null ? (
+        <div className="index" onPointerLeave={() => setPreview(null)}>
+          {PROJECTS.map((p, i) => (
+            <button key={p.name} className="pcard" onClick={() => { setPreview(null); setShowcase(i) }}
+              onPointerEnter={() => setPreview(i)} onFocus={() => setPreview(i)} onBlur={() => setPreview(null)}>
+              <span className="pcard__thumb"><img src={p.image} alt="" loading="lazy" /></span>
+              <span className="pcard__body">
+                <span className="project__label mono">0{i + 1} / {p.name}</span>
+                <span className="pcard__title">{p.title}</span>
+                <span className="pcard__meta mono">{p.url ? <><i className="pcard__live" /> Live</> : 'In progress'} · {p.tags[0]}</span>
+              </span>
+              <span className="pcard__arrow" aria-hidden>→</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <ProjectPage index={showcase} />
+      )}
+    </>
+  )
+}
+
+function ProjectPage({ index }) {
+  const p = PROJECTS[index]
+  const setShowcase = useStore((s) => s.setShowcase)
+  const next = (index + 1) % PROJECTS.length
+  const Thumb = p.url ? 'a' : 'div'
+  const link = p.url ? { href: p.url, target: '_blank', rel: 'noreferrer' } : {}
+  return (
+    <article className={`project project--page ${p.url ? 'project--live' : 'project--soon'}`} key={p.name}>
+      <span className="project__label mono">0{index + 1} / {p.name}</span>
+      <h2 className="project__title project__title--big">{p.title}</h2>
+      <Thumb className="project__thumb" {...link}>
+        <img src={p.image} alt={p.alt} />
+        {!p.url && <span className="project__cta mono">Coming soon</span>}
+      </Thumb>
+      <div className="project__cols">
+        <div>
+          <p>{p.text}</p>
+          <div className="project__tags">
+            {p.tags.map((t) => (
+              <span key={t}>{t}</span>
+            ))}
+          </div>
+        </div>
+        {p.impact && (
+          <div className="project__impact">
+            <span className="mono">The impact</span>
+            <p>{p.impact}</p>
+          </div>
+        )}
+      </div>
+      <div className="project__foot">
+        {p.url && (
+          <a className="btn btn--primary" href={p.url} target="_blank" rel="noreferrer">
+            Visit {p.name} ↗
+          </a>
+        )}
+        <button className="btn" onClick={() => setShowcase(next)}>
+          Next: {PROJECTS[next].name} →
+        </button>
+      </div>
+    </article>
   )
 }
 
@@ -266,6 +304,8 @@ export function Panel() {
   const active = useStore((s) => s.active)
   const entered = useStore((s) => s.entered)
   const close = useStore((s) => s.close)
+  const showcase = useStore((s) => s.showcase)
+  const setShowcase = useStore((s) => s.setShowcase)
   // keep the last section mounted while the panel slides out
   const [shown, setShown] = useState(active)
   const [modal, setModal] = useState(() => window.matchMedia('(max-width: 860px)').matches)
@@ -280,7 +320,7 @@ export function Panel() {
   useEffect(() => {
     if (active) setShown(active)
     if (body.current) body.current.scrollTop = 0
-  }, [active])
+  }, [active, showcase])
   useEffect(() => {
     if (!active || !entered || !dialog.current) return
     const previous = document.activeElement
@@ -300,21 +340,26 @@ export function Panel() {
   }, [active, shown, modal, entered])
   const s = shown && SECTIONS[shown]
   const Body = shown && BODIES[shown]
+  const page = shown === 'projects' && showcase !== null // an opened project: a wider panel of its own
   return (
-    <aside ref={dialog} className={`panel ${active && entered ? 'is-open' : ''}`} role={modal ? 'dialog' : 'region'} aria-modal={active && entered && modal ? true : undefined} aria-label={s?.label || 'Studio section'} aria-hidden={!active || !entered} inert={active && entered ? undefined : ''}>
+    <aside ref={dialog} className={`panel ${active && entered ? 'is-open' : ''} ${page ? 'panel--wide' : ''}`} role={modal ? 'dialog' : 'region'} aria-modal={active && entered && modal ? true : undefined} aria-label={s?.label || 'Studio section'} aria-hidden={!active || !entered} inert={active && entered ? undefined : ''}>
       {s && (
         <div className="panel__scroll" ref={body} key={shown}>
           <div className="panel__head">
-            <button className="back mono" onClick={close}>
-              ← Back to studio
+            <button className="back mono" onClick={page ? () => setShowcase(null) : close}>
+              {page ? '← All work' : '← Back to studio'}
             </button>
             <span className="mono muted">
               {s.index} / {s.object}
             </span>
           </div>
-          <p className="mono kicker">{s.label}</p>
-          <h2>{s.title}</h2>
-          {s.intro ? <p className="intro">{s.intro}</p> : <div className="intro-gap" />}
+          {!page && (
+            <>
+              <p className="mono kicker">{s.label}</p>
+              <h2>{s.title}</h2>
+              {s.intro ? <p className="intro">{s.intro}</p> : <div className="intro-gap" />}
+            </>
+          )}
           <Body />
         </div>
       )}

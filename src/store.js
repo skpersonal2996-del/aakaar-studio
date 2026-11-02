@@ -8,8 +8,14 @@ export const useStore = create((set) => ({
   music: false,
   enter: (music) => set({ entered: true, music }),
   toggleMusic: () => set((s) => ({ music: !s.music })),
-  focus: (id) => set({ active: id, hovered: null, peek: null }),
-  close: () => set({ active: null, peek: null }),
+  focus: (id) => set({ active: id, hovered: null, peek: null, showcase: null, preview: null }),
+  close: () => set({ active: null, peek: null, showcase: null, preview: null }),
+  // Projects: the one opened in the panel (the camera moves in on Shruti's laptop, which shows it),
+  // and the one hovered in the list (only the laptop screen follows that).
+  showcase: null,
+  preview: null,
+  setShowcase: (showcase) => set({ showcase }),
+  setPreview: (preview) => set({ preview }),
   // a light zoom towards something (e.g. the developer) without opening a panel
   peek: null,
   setPeek: (peek) => set({ peek }),

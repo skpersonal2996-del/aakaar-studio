@@ -71,6 +71,25 @@ export function screenTexture(kind) {
   return (cache[kind] = texture)
 }
 
+// A project's screenshot, cropped to fill the laptop screen (the images are 3:2, the screen 16:10).
+export function projectTexture(src) {
+  if (cache[src]) return cache[src]
+  const canvas = document.createElement('canvas')
+  canvas.width = 1280; canvas.height = 800
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 8
+  const image = new Image()
+  image.onload = () => {
+    const scale = Math.max(canvas.width / image.width, canvas.height / image.height)
+    const w = image.width * scale, h = image.height * scale
+    canvas.getContext('2d').drawImage(image, (canvas.width - w) / 2, 0, w, h) // keep the top: the site's header
+    texture.needsUpdate = true
+  }
+  image.src = src
+  return (cache[src] = texture)
+}
+
 // The laptop's screen has no UVs: lay the picture across the face that looks at the keyboard, upright, in world space.
 export function mapScreen(screen, keyboardCentre) {
   screen.geometry = screen.geometry.clone()
@@ -80,10 +99,12 @@ export function mapScreen(screen, keyboardCentre) {
   const centre = box.getCenter(new THREE.Vector3()).applyMatrix4(screen.matrixWorld)
   const toKeys = keyboardCentre.clone().sub(centre)
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(screen.matrixWorld)
-  let front = null
-  for (let i = 0; i < nrm.count && !front; i++) {
+  // the screen is a thin box: its face is the side pointing most directly at the keys
+  let front = null, best = 0
+  toKeys.normalize()
+  for (let i = 0; i < nrm.count; i++) {
     const n = new THREE.Vector3().fromBufferAttribute(nrm, i).applyMatrix3(normalMatrix).normalize()
-    if (n.dot(toKeys) > 0 && Math.abs(n.y) < 0.95) front = n
+    if (n.dot(toKeys) > best && Math.abs(n.y) < 0.95) [front, best] = [n, n.dot(toKeys)]
   }
   if (!front) return
   const right = new THREE.Vector3(0, 1, 0).cross(front).normalize()

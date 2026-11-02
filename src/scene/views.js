@@ -49,6 +49,8 @@ export const VIEWS = {
   about: { pos: [4.6, 2.05, -1.45], target: [4.85, 2.1, -4.9] }, // the founders' ID wall, back wall
   contact: { pos: [0.25, 1.4, 2.35], target: [-0.1, 0.78, 1.32] },
 }
+// A project opened from the list: close in over Shruti's shoulder onto her laptop, which shows it.
+export const SHOWCASE = { pos: [2.0, 1.65, 1.45], target: [1.27, 0.86, 0.78] }
 
 // Gentle close-ups that don't open a panel.
 export const PEEKS = {

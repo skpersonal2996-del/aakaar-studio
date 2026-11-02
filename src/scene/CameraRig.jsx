@@ -4,7 +4,7 @@ import { CameraControls } from '@react-three/drei'
 import CameraControlsImpl from 'camera-controls'
 import * as THREE from 'three'
 import { useStore } from '../store'
-import { HOME, INTRO, PEEKS, VIEWS } from './views'
+import { HOME, INTRO, PEEKS, SHOWCASE, VIEWS } from './views'
 
 const { ACTION } = CameraControlsImpl
 
@@ -32,14 +32,15 @@ function unlock(c) {
   c.maxDistance = 100
 }
 
-// While a panel is open the object is framed in the visible (left) part of the screen.
-function framed(view, wide) {
+// While a panel is open the object is framed in the visible (left) part of the screen; `push` moves it
+// further left, for the wider panel of an opened project.
+function framed(view, wide, push = 0.2) {
   const pos = new THREE.Vector3().fromArray(view.pos)
   const target = new THREE.Vector3().fromArray(view.target)
   if (wide) {
     const dir = target.clone().sub(pos)
     const right = new THREE.Vector3().crossVectors(dir, THREE.Object3D.DEFAULT_UP).normalize()
-    const shift = right.multiplyScalar(dir.length() * 0.2)
+    const shift = right.multiplyScalar(dir.length() * push)
     pos.add(shift)
     target.add(shift)
   } else {
@@ -65,6 +66,7 @@ export function CameraRig() {
   const entered = useStore((s) => s.entered)
   const resetTick = useStore((s) => s.resetTick)
   const peek = useStore((s) => s.peek)
+  const showcase = useStore((s) => s.active === 'projects' && s.showcase !== null)
   const wide = size.width > 860
   // Portrait screens see less of the room, so the home view backs away from it.
   const k = THREE.MathUtils.clamp(1.25 / (size.width / size.height), 1, 2.1)
@@ -120,7 +122,7 @@ export function CameraRig() {
     setInput(c, false)
     if (active) {
       c.smoothTime = 0.65
-      c.setLookAt(...framed(VIEWS[active], wide), motion)
+      c.setLookAt(...(showcase ? framed(SHOWCASE, wide, 0.27) : framed(VIEWS[active], wide)), motion)
     } else if (peek) {
       c.smoothTime = 0.7
       c.setLookAt(...PEEKS[peek].pos, ...PEEKS[peek].target, motion)
@@ -136,7 +138,7 @@ export function CameraRig() {
     return () => {
       cancelled = true
     }
-  }, [active, entered, wide, k, resetTick, peek])
+  }, [active, entered, wide, k, resetTick, peek, showcase])
 
   return <CameraControls ref={ref} makeDefault />
 }

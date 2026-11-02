@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber'
 import { Html, useCursor, useGLTF } from '@react-three/drei'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import * as THREE from 'three'
-import { DESIGNER, DEVELOPER } from '../content'
+import { DESIGNER, DEVELOPER, PROJECTS } from '../content'
 import { useStore } from '../store'
 import { SEATS } from './views'
-import { mapScreen, screenTexture } from './screens'
+import { mapScreen, projectTexture, screenTexture } from './screens'
 
 const base = import.meta.env.BASE_URL
 // Where each face's cheeks are, in the model's bind pose as Blender sees it (found from the face renders: below and
@@ -34,8 +34,9 @@ const url = (name) => `${base}characters/${name}.glb`
 const PROP = { chair: `${base}studio/office-chair.glb`, laptop: `${base}studio/laptop.glb` }
 
 // Bones the wave drives: one hand waves and the other rests on the keys, so typing stops while the
-// person says hi (blender/seat_meshy_character.py). The legs keep the typing clip, so they stay seated.
-const UPPER = new Set(['Spine', 'Spine01', 'Spine02', 'neck', 'Head', ...['Left', 'Right'].flatMap((side) =>
+// person says hi (blender/seat_meshy_character.py). The legs keep the typing clip, so they stay seated, and so
+// do the spine and head: the wave's own keys throw the torso and head back.
+const UPPER = new Set([...['Left', 'Right'].flatMap((side) =>
   ['Shoulder', 'Arm', 'ForeArm', 'Hand', 'Fingers1', 'Fingers2'].map((b) => side + b))])
 // Both casts type with their heads level, looking over the laptops; this tilt (radians, about the
 // character's own left-right axis) bows the head and neck towards the screen. It eases off while they wave.
@@ -102,6 +103,7 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
   const actions = useRef({})
   const tilt = useRef(1)
+  const greet = useRef(0)
   const neckBones = useMemo(() => TILT_SHARE.map(([name, share]) => [actor.getObjectByName(name), share])
     .filter(([b]) => b).map(([b, share]) => [b, share, b.quaternion.clone()]), [actor])
   const tmp = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), axis: new THREE.Vector3(),
@@ -194,13 +196,18 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     if (g.next <= 0 && !waving) Object.assign(g, { t: 0, next: 14 + Math.random() * 16, camera: Math.random() < 0.4 })
     g.t += dt
     const look = waving ? 0 : Math.min(1, g.t / 0.4, Math.max(0, (2.4 - g.t) / 0.5))
-    const lift = THREE.MathUtils.smoothstep(look, 0, 1)
-    tilt.current += ((waving ? 0 : 1 - lift) - tilt.current) * (1 - Math.exp(-dt * 6))
+    const glancing = THREE.MathUtils.smoothstep(look, 0, 1)
+    // While waving they look round at the visitor, easing in and back out with the wave.
+    const ease = 1 - Math.exp(-dt * 6)
+    greet.current += ((waving ? 1 : 0) - greet.current) * ease
+    const lift = Math.max(glancing, greet.current)
+    tilt.current += ((waving ? 0 : 1 - glancing) - tilt.current) * ease
     let yaw = 0
-    if (g.camera && lift > 0) {
+    const toCamera = Math.max(g.camera ? glancing : 0, greet.current)
+    if (toCamera > 0.001) {
       actor.getWorldPosition(tmp.v)
       const to = tmp.w.copy(camera.position).sub(tmp.v).setY(0).normalize()
-      yaw = Math.atan2(forward.x * to.z - forward.z * to.x, forward.x * to.x + forward.z * to.z) * -0.6 * lift
+      yaw = Math.atan2(forward.x * to.z - forward.z * to.x, forward.x * to.x + forward.z * to.z) * 0.6 * toCamera
       yaw = THREE.MathUtils.clamp(yaw, -0.7, 0.7)
     }
     for (const [b, share, untilted] of neckBones) {
@@ -227,7 +234,7 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
 
 // Office chair or laptop: live props, because each character pair sits at its own distance. A laptop shows its
 // owner's work on the screen (screens.js).
-function Prop({ src, screen, ...props }) {
+function Prop({ src, screen, show = null, ...props }) {
   const { scene } = useGLTF(src, false, true)
   const copy = useMemo(() => {
     const c = scene.clone()
@@ -243,17 +250,25 @@ function Prop({ src, screen, ...props }) {
     mapScreen(glass, centre)
     glass.material = new THREE.MeshBasicMaterial({ map: screenTexture(screen), toneMapped: false, color: new THREE.Color(0.82, 0.82, 0.82) })
   }, [copy, screen])
+  // While Projects is open, the designer's screen shows the project picked (or hovered) in the panel.
+  useLayoutEffect(() => {
+    const glass = copy.getObjectByName('Screen')
+    if (!screen || !glass?.material.isMeshBasicMaterial) return
+    glass.material.map = show === null ? screenTexture(screen) : projectTexture(PROJECTS[show].image)
+    glass.material.color.setScalar(show === null ? 0.82 : 1)
+  }, [copy, screen, show])
   return <primitive object={copy} {...props} />
 }
 
 function Seat({ who, cast, intro, phase }) {
   const s = SEATS[cast][who]
+  const show = useStore((st) => who === 'designer' && st.active === 'projects' ? st.preview ?? st.showcase ?? 0 : null)
   return (
     <>
       <SeatedPerson model={url(MODELS[cast][who])} name={MODELS[cast][who]} intro={intro} peekId={who} phase={phase} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
         position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
-      <Prop src={PROP.laptop} screen={who === 'developer' ? 'code' : 'design'} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />
+      <Prop src={PROP.laptop} screen={who === 'developer' ? 'code' : 'design'} show={show} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />
     </>
   )
 }
