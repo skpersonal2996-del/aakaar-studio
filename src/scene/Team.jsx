@@ -138,6 +138,10 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
   const chest = useMemo(() => actor.getObjectByName('Spine'), [actor])
   const arms = useMemo(() => ['Left', 'Right'].map((side) => ['Arm', 'ForeArm', 'Hand'].map((b) => actor.getObjectByName(side + b))), [actor])
   const pet = useMemo(() => ({ target: new THREE.Vector3(), shoulder: new THREE.Vector3() }), [])
+  // Bones turned on top of the clip each frame (the chest breathing, the arms reaching for the cat), with their
+  // clip pose: once the typing stops the mixer stops rewriting them, so the turns would pile up frame on frame.
+  const layered = useMemo(() => [chest, ...arms.flatMap((arm) => arm.slice(0, 2))].filter(Boolean)
+    .map((b) => [b, b.quaternion.clone()]), [chest, arms])
   const glance = useRef({ t: 9, next: 6 + phase * 4 + Math.random() * 8, camera: false })
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
   const [hover, setHover] = useState(false)
@@ -206,9 +210,11 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     // The typing clip has no head or neck keys, so the mixer leaves those bones alone: put back last
     // frame's untilted pose first, or the tilt would add up frame after frame.
     if (headTilt) for (const [b, , untilted] of neckBones) b.quaternion.copy(untilted)
+    for (const [b, clean] of layered) b.quaternion.copy(clean)
     const petting = pets ? catPet.weight : 0 // the cat is sitting by her: she stops typing and strokes its head
     speed.current += ((still || petting > 0.3 ? 0 : 1) - speed.current) * (1 - Math.exp(-dt * 4))
     mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05) * speed.current)
+    for (const [b, clean] of layered) clean.copy(b.quaternion)
     if (!headTilt || reduced.matches) return
     const t = clock.elapsedTime + phase * 1.7
     actor.getWorldQuaternion(tmp.p)

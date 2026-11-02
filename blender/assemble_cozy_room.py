@@ -61,8 +61,9 @@ SHELF_LIB = ROOT / 'bookshelf-library.blend'
 if SPACIOUS: old += ['Plant · trailing'] + (['Bookshelf'] if SHELF_LIB.exists() else [])  # bamboo palm; the old bookshelf
 for n in old: remove(n)
 if SPACIOUS:  # the first site's low-poly desk pot and its near-black succulent: they look broken up close
-    # and its plain bottle cylinders and box books (the Meshy book stack stands beside them)
-    for n in ['Mesh_234'] + [f'Mesh_{i}' for i in range(235, 247)] + ['Mesh_257', 'Mesh_259', 'Mesh_260', 'Mesh_263', 'Mesh_264', 'Mesh_265']:
+    # and its plain bottle cylinders (with the cap, Mesh_258, that floated once they were gone) and box books (the
+    # Meshy book stack stands beside them)
+    for n in ['Mesh_234'] + [f'Mesh_{i}' for i in range(235, 247)] + ['Mesh_257', 'Mesh_258', 'Mesh_259', 'Mesh_260', 'Mesh_263', 'Mesh_264', 'Mesh_265']:
         if n in O: bpy.data.objects.remove(O[n], do_unlink=True)
 # Shelf, credenza and cabinet bodies only: the books, lamps, plants and LED strips on them stay.
 for n in ['Mesh_83', 'Mesh_84', 'Mesh_85', 'Mesh_86', 'Mesh_446', 'Mesh_447', 'Mesh_448', 'Mesh_449', 'Mesh_450',

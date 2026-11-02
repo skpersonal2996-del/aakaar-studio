@@ -170,6 +170,9 @@ export function Cat() {
     return { head: find('head'), tail: ['tailstart', 'tail1', 'tail2', 'tail3'].map(find).filter(Boolean) }
   }, [scene])
   const q = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion() }), [])
+  // The head and tail are turned on top of the walk; with the walk frozen the mixer stops rewriting them, so their
+  // clip pose is kept and put back each frame, or the turns would pile up.
+  const layered = useMemo(() => [bones.head, ...bones.tail].filter(Boolean).map((b) => [b, b.quaternion.clone()]), [bones])
   const clips = useRef({})
 
   useLayoutEffect(() => {
@@ -261,7 +264,9 @@ export function Cat() {
     }
     if (v.phase === 'sit') yaw = v.yaw + angle(yawTo(SPOT, DOWN_TO) - v.yaw) * ease(THREE.MathUtils.clamp((v.t - SIT + 0.6) / 0.6, 0, 1))
     walking.timeScale = w.pace
+    for (const [b, clean] of layered) b.quaternion.copy(clean)
     mixer.update(dt)
+    for (const [b, clean] of layered) clean.copy(b.quaternion)
 
     // light: from the samples along the loop, or from the surface under it off the loop; eased so it never jumps
     if (!light.current && roomLight.meshes.length && roomLight.warm?.image) {
