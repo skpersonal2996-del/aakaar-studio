@@ -61,13 +61,11 @@ const STILL = [
 function stillShelfPlants(mesh) {
   const wind = mesh.geometry.attributes._wind, pos = mesh.geometry.attributes.position, p = new THREE.Vector3()
   mesh.updateWorldMatrix(true, false)
-  let cleared = 0
   for (let i = 0; i < wind.count; i++) {
     if (!wind.getX(i)) continue
     p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
-    if (STILL.some((box) => box.containsPoint(p))) { wind.setX(i, 0); cleared++ }
+    if (STILL.some((box) => box.containsPoint(p))) wind.setX(i, 0)
   }
-  if (import.meta.env.DEV) console.debug('shelf plants held still:', cleared, 'vertices')
 }
 function sway(material) {
   const compile = material.onBeforeCompile
@@ -126,7 +124,7 @@ function convert(scene, albedo, warm, nightMap) {
     const { web_emissive, web_emissive_night, web_light_scale = 1, web_light_scale_night = 1, web_cutout, web_gloss, web_tint } = old.userData
     const scales = [web_light_scale * WARM_LEVEL, web_light_scale_night]
     if (web_emissive) {
-      o.material = new THREE.MeshBasicMaterial({ map: old.emissiveMap, toneMapped: false })
+      o.material = new THREE.MeshBasicMaterial({ map: old.emissiveMap ?? null, toneMapped: false })
       if (old.emissiveMap) o.material.color.setScalar(1.15)
       else {
         o.material.color.setRGB(...web_emissive).multiplyScalar(GLOW)

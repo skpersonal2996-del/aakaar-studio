@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "assets:optimize": "node scripts/optimize-assets.mjs",
     "assets:characters": "node scripts/optimize-characters.mjs",
-    "assets:room": "node scripts/optimize-room.mjs"
+    "assets:room": "node scripts/optimize-room.mjs",
+    "assets:cat": "node scripts/optimize-cat.mjs"
   },
   "dependencies": {
     "@fontsource-variable/comfortaa": "^5.3.0",
@@ -23,7 +24,6 @@
     "@react-three/fiber": "^8.17.10",
     "@react-three/postprocessing": "^2.16.3",
     "camera-controls": "^2.9.0",
-    "lucide-react": "^1.65.0",
     "postprocessing": "^6.36.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

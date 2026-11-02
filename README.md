@@ -72,12 +72,14 @@ blender --background blender/studio-cozy.blend --python-exit-code 1 --python ble
 blender --background --factory-startup --python-exit-code 1 --python blender/build_furniture.py   # → furniture-library.blend
 bash blender/meshy_batch.sh && bash blender/meshy_collect.sh                               # Meshy models (credits; see below)
 blender --background --python-exit-code 1 --python blender/assemble_cozy_room.py       # → studio-assembled.blend
-for c in "guy vinay 1.0" "girl shruti 1.0" "chibi-guy vinay 1.35" "chibi-girl shruti 1.35"; do
+for c in "guy6 vinay 1.0" "girl shruti 1.0" "chibi-guy vinay 1.35" "chibi-girl shruti 1.35"; do
   blender --background --factory-startup --python-exit-code 1 --python blender/seat_meshy_character.py -- $c; done
+cp blender/generated/guy6-seated.glb blender/generated/guy-seated.glb                     # classic Vinay is the Meshy 6 guy
 blender --background --python-exit-code 1 --python blender/place_characters.py -- adult   # and -- chibi
 blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/bake_cozy_room.py -- 4096 256
 blender --background blender/studio-adult.blend --python-exit-code 1 --python blender/export_live_props.py
-npm run assets:room && npm run assets:characters                                           # → public/studio, public/characters
+blender --background --factory-startup --python-exit-code 1 --python blender/prepare_cat.py   # Puszek → blender/generated/cat.glb
+npm run assets:room && npm run assets:characters && npm run assets:cat                    # → public/studio, public/characters
 ```
 
 - `build_cozy_room.py` starts from `studio-portfolio.blend` (the earlier web room plus characters), shrinks the shell and rearranges the furniture. The desk and characters keep their positions.

@@ -19,12 +19,14 @@ for(const name of process.argv.slice(2).length?process.argv.slice(2):Object.keys
  const joints=doc.getRoot().listSkins()[0]?.listJoints().map(n=>n.getName())
  const clips=doc.getRoot().listAnimations().map(a=>a.getName())
  if(!joints?.includes('Head')||!clips.includes('TypingIdle')||!clips.includes('Wave'))throw new Error(`${name}: missing skeleton or animations (${clips})`)
- // Lossless base colour avoids colour ringing on the dark hair/skin boundaries. Geometry is already
- // about 100K triangles from decimate_meshy.py.
+ // The website makes the characters matte and drops Meshy's normal and roughness maps (Team.jsx fabricMaterial),
+ // and plays only TypingIdle and Wave, so the rest is left out. Base colour at WebP quality 95 matches lossless on
+ // the dark hair/skin edges at 3x zoom, at an eighth of the size. Geometry is already about 100K triangles from
+ // decimate_meshy.py.
+ for(const m of doc.getRoot().listMaterials()){m.setNormalTexture(null);m.setMetallicRoughnessTexture(null);m.setOcclusionTexture(null)}
+ for(const a of doc.getRoot().listAnimations())if(!['TypingIdle','Wave'].includes(a.getName()))a.dispose()
  await doc.transform(resample({tolerance:1e-6}),dedup(),prune(),
-  textureCompress({encoder:sharp,targetFormat:'webp',slots:/baseColorTexture/,resize:[2048,2048],lossless:true,effort:80}),
-  textureCompress({encoder:sharp,targetFormat:'webp',slots:/normalTexture/,resize:[1024,1024],quality:90}),
-  textureCompress({encoder:sharp,targetFormat:'webp',slots:/(metallicRoughnessTexture|occlusionTexture)/,resize:[1024,1024],quality:90}),
+  textureCompress({encoder:sharp,targetFormat:'webp',slots:/baseColorTexture/,resize:[2048,2048],quality:95,effort:80}),
   meshopt({encoder:MeshoptEncoder,level:'high',quantizePosition:16,quantizeNormal:16,quantizeTexcoord:16,quantizeWeight:16}))
  await io.write(target,doc)
  const check=await io.read(target)

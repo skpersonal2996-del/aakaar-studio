@@ -329,9 +329,14 @@ function Seat({ who, cast, intro, phase }) {
 // Face to face across the baked desk. The cast toggle in the top bar swaps the character pair.
 export function Team() {
   const cast = useStore((s) => s.cast)
-  useEffect(() => { // fetch the other pair in the background so the toggle is instant
-    for (const name of Object.values(MODELS[cast === 'chibi' ? 'classic' : 'chibi'])) useGLTF.preload(url(name), false, true)
-  }, [cast])
+  const entered = useStore((s) => s.entered)
+  useEffect(() => { // fetch the other pair in the background so the toggle is instant, once the room is in and idle
+    if (!entered) return
+    const other = () => { for (const name of Object.values(MODELS[cast === 'chibi' ? 'classic' : 'chibi'])) useGLTF.preload(url(name), false, true) }
+    const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1))
+    const timer = setTimeout(() => idle(other), 6000)
+    return () => clearTimeout(timer)
+  }, [cast, entered])
   return (
     <group key={cast}>
       <Seat who="developer" cast={cast} intro={DEVELOPER} />

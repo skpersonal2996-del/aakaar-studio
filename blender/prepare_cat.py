@@ -2,7 +2,7 @@
 
 blender --background --factory-startup --python-exit-code 1 --python blender/prepare_cat.py -- [TRIANGLES] [TEXTURE_PX]
 Reads blender/source/cat/puszek-walk.glb (Meshy export, 'All Animations', single file) and writes
-public/studio/cat.glb: the skinned mesh decimated before the armature (so its weights survive), the
+blender/generated/cat.glb (then `npm run assets:cat` compresses it into public/studio/cat.glb): the skinned mesh decimated before the armature (so its weights survive), the
 texture resized, the walk renamed 'Walk', and two clips posed here, 'Jump' (in place: the website moves her up
 onto the desk and back down) and 'Sit' (a breathing loop). The website walks it around the room (src/scene/Cat.jsx).
 """
@@ -106,7 +106,7 @@ arm.animation_data.action = walk
 for a in (walk, jump, sitting):
     t = arm.animation_data.nla_tracks.new(); t.strips.new(a.name, 0, a); t.mute = True
 after = sum(len(p.vertices) - 2 for o in meshes for p in o.data.polygons)
-out = ROOT.parent / 'public/studio/cat.glb'
+out = ROOT / 'generated/cat.glb'
 bpy.ops.export_scene.gltf(filepath=str(out), export_format='GLB', export_image_format='WEBP', export_image_quality=85,
                           export_animations=True, export_animation_mode='ACTIONS', export_skins=True)
 print('CAT', total, '->', after, 'triangles,', len(bpy.data.actions), 'action(s) ->', out, flush=True)
