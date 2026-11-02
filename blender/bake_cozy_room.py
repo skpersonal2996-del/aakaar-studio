@@ -219,6 +219,7 @@ PLANT_WORDS = ('plant', 'calathea', 'succulent', 'leaves')
 def plant_root(src):
     root = None
     while src:
+        if 'bookshelf' in src.name.lower(): return None  # the little pots on the shelves sit still, out of the draught
         if any(k in src.name.lower() for k in PLANT_WORDS): root = src
         src = src.parent
     return root

@@ -52,6 +52,23 @@ function bakedMaterial({ map, warm, nightMap, scales, cutout }) {
 
 // Leaves move with the vertex weight the bake stored: a slow sway plus a quick flutter, out of step
 // from plant to plant. Everything else in the mesh has a weight of 0 and stays put.
+// The little pots on the bookshelf stay still too: this bake gave them weights (bake_cozy_room.py now skips them),
+// so they are cleared here, inside each pot's box (web coordinates, y up; from the Blender scene).
+const STILL = [
+  [[-5.84, 0.18, 0.08], [-5.63, 0.46, 0.3]], [[-5.88, 1.04, 1.89], [-5.54, 1.3, 2.26]], [[-5.9, 1.52, -0.49], [-5.66, 1.8, -0.25]],
+  [[-5.89, 2.0, 2.11], [-5.54, 2.26, 2.49]], [[-5.9, 2.48, 2.45], [-5.53, 2.74, 2.85]],
+].map(([min, max]) => new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max)))
+function stillShelfPlants(mesh) {
+  const wind = mesh.geometry.attributes._wind, pos = mesh.geometry.attributes.position, p = new THREE.Vector3()
+  mesh.updateWorldMatrix(true, false)
+  let cleared = 0
+  for (let i = 0; i < wind.count; i++) {
+    if (!wind.getX(i)) continue
+    p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
+    if (STILL.some((box) => box.containsPoint(p))) { wind.setX(i, 0); cleared++ }
+  }
+  if (import.meta.env.DEV) console.debug('shelf plants held still:', cleared, 'vertices')
+}
 function sway(material) {
   const compile = material.onBeforeCompile
   material.onBeforeCompile = (shader) => {
@@ -144,7 +161,7 @@ function convert(scene, albedo, warm, nightMap) {
       Object.assign(roomLight, { warm, night: nightMap, scales })
       roomLight.meshes.push({ mesh: o, channel: 0, scales })
     }
-    if (o.geometry.attributes._wind) sway(o.material)
+    if (o.geometry.attributes._wind) { stillShelfPlants(o); sway(o.material) }
     old.dispose()
     o.matrixAutoUpdate = flames.some((f) => f.mesh === o)
     o.updateMatrix()
