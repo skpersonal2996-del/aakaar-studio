@@ -517,12 +517,69 @@ for b in arm_bones:  # settle back into the typing pose
         if fc.data_path == f'pose.bones["{b}"].rotation_quaternion':
             fc.keyframe_points.insert(78, fc.keyframe_points[0].co[1])
 
-# --- elbows ---------------------------------------------------------------------------------------------
-# Typing bends the forearms up hard; Meshy's weights switch from upper arm to forearm in a narrow band, so the
-# inner elbow folds into itself and the sleeve's inside shows as a dark striped gash. Smoothing the weights within
-# 8 cm of each elbow spreads the bend out (wider or stronger tears the sleeve elsewhere). The classic girl's sleeves
-# fold cleanly already, and smoothing hers opens shards in the forearm instead, so she keeps her own weights.
-if name != 'girl':
+# --- skin weights ---------------------------------------------------------------------------------------
+# Meshy's clothes are layered (sweater over shirt over body) and its weights differ slightly between layers that
+# sit together, so in the typing pose inner layers poke through as shards, worst at shoulders and elbows. For the
+# chibis the weights are rebuilt through a solid proxy: copied onto a voxel remesh (one surface, no layers),
+# smoothed there, and copied back onto every layer from the nearest point of that one surface, so layers move
+# together. The head, hair and hands keep their own weights. Classic Vinay gets only a smoothing at the elbows
+# (8 cm), where his sleeves crease; the classic girl's sleeves fold cleanly as they are.
+from mathutils.bvhtree import BVHTree
+import bmesh
+
+def tri_mesh(me):
+    bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.triangulate(bm, faces=bm.faces)
+    co = np.array([tuple(v.co) for v in bm.verts]); tris = np.array([[v.index for v in f.verts] for f in bm.faces])
+    bm.free(); return co, tris
+
+def surface_weights(src_co, src_tris, W, points):
+    """Weights at the nearest point of the source surface, interpolated across its triangle."""
+    tree = BVHTree.FromPolygons(src_co.tolist(), src_tris.tolist())
+    out = np.zeros((len(points), W.shape[1]))
+    for i, p in enumerate(points):
+        loc, _, f, _ = tree.find_nearest(p)
+        a, b, c = src_co[src_tris[f]]
+        v0, v1, v2 = b - a, c - a, np.array(loc) - a
+        d00, d01, d11, d20, d21 = v0 @ v0, v0 @ v1, v1 @ v1, v2 @ v0, v2 @ v1
+        den = d00 * d11 - d01 * d01 or 1e-12
+        v = (d11 * d20 - d01 * d21) / den; w = (d00 * d21 - d01 * d20) / den
+        bary = np.clip([1 - v - w, v, w], 0, 1); bary /= bary.sum()
+        out[i] = bary @ W[src_tris[f]]
+    return out
+
+if 'chibi' in name:
+    groups = [g for g in mesh.vertex_groups if g.name in D]
+    col = {g.index: i for i, g in enumerate(groups)}
+    nv = len(mesh.data.vertices)
+    SW = np.zeros((nv, len(groups)))
+    for v in mesh.data.vertices:
+        for g in v.groups:
+            if g.group in col: SW[v.index, col[g.group]] = g.weight
+    co, tris = tri_mesh(mesh.data)
+    proxy = mesh.copy(); proxy.data = mesh.data.copy(); scene.collection.objects.link(proxy)
+    proxy.modifiers.clear(); proxy.vertex_groups.clear(); proxy.data.remesh_voxel_size = .012 * local
+    bpy.ops.object.select_all(action='DESELECT'); proxy.select_set(True); bpy.context.view_layer.objects.active = proxy
+    bpy.ops.object.voxel_remesh()
+    pco, ptris = tri_mesh(proxy.data)
+    bpy.data.objects.remove(proxy)
+    PW = surface_weights(co, tris, SW, pco)
+    edges = np.concatenate([ptris[:, [0, 1]], ptris[:, [1, 2]], ptris[:, [2, 0]]])
+    deg = np.bincount(edges.ravel(), minlength=len(pco))
+    for _ in range(10):  # more passes start to dent the clothes
+        acc = np.zeros_like(PW); np.add.at(acc, edges[:, 0], PW[edges[:, 1]]); np.add.at(acc, edges[:, 1], PW[edges[:, 0]])
+        PW = .5 * PW + .5 * acc / np.maximum(deg, 1)[:, None]
+    fixed = [i for i, g in enumerate(groups) if any(k in g.name for k in ('Head', 'neck', 'Hand', 'Finger'))]
+    body = ~np.isin(SW.argmax(1), fixed) & (SW.sum(1) > 0)
+    SW[body] = surface_weights(pco, ptris, PW, co[:nv][body])
+    order = np.argsort(-SW, axis=1)
+    SW[np.arange(nv)[:, None], order[:, 4:]] = 0  # four bones a vertex, normalised
+    SW /= np.maximum(SW.sum(1, keepdims=True), 1e-9)
+    for g in groups:
+        i = col[g.index]
+        g.remove(list(range(nv)))
+        for vi in np.flatnonzero(SW[:, i] > 1e-4): g.add([int(vi)], float(SW[vi, i]), 'REPLACE')
+    print('WEIGHTS rebuilt through a', len(pco), 'vertex proxy for', int(body.sum()), 'vertices', flush=True)
+elif name != 'girl':
     co = np.array([tuple(v.co) for v in mesh.data.vertices])
     near_elbow = np.zeros(len(co), bool)
     for side in ('Left', 'Right'):

@@ -7,6 +7,7 @@ import { DESIGNER, DEVELOPER, PROJECTS } from '../content'
 import { useStore } from '../store'
 import { SEATS } from './views'
 import { mapScreen, projectTexture, screenTexture } from './screens'
+import { catPet } from './Cat'
 
 const base = import.meta.env.BASE_URL
 // Where each face's cheeks are, in the model's bind pose as Blender sees it (found from the face renders: below and
@@ -94,10 +95,35 @@ function fabricMaterial(old, neckHeight, blush) {
   material.userData.fabric = true
   return material
 }
+// Two-bone reach: turn the upper arm and forearm (about world axes, on top of the typing pose) so the wrist meets
+// `target`, bending the elbow the way it already bends. `weight` blends from the typing pose to the reach.
+const ik = { s: new THREE.Vector3(), e: new THREE.Vector3(), w: new THREE.Vector3(), d: new THREE.Vector3(), pole: new THREE.Vector3(),
+  e2: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), q: new THREE.Quaternion(), p: new THREE.Quaternion(), id: new THREE.Quaternion() }
+function rotateWorld(bone, q) {
+  bone.parent.getWorldQuaternion(ik.p)
+  bone.quaternion.premultiply(ik.p.clone().invert().multiply(q).multiply(ik.p))
+  bone.updateMatrixWorld(true)
+}
+function reach(upper, lower, hand, target, weight) {
+  upper.getWorldPosition(ik.s); lower.getWorldPosition(ik.e); hand.getWorldPosition(ik.w)
+  const a = ik.s.distanceTo(ik.e), b = ik.e.distanceTo(ik.w)
+  ik.d.copy(target).sub(ik.s)
+  const dist = THREE.MathUtils.clamp(ik.d.length(), Math.abs(a - b) + 1e-3, (a + b) * 0.995)
+  ik.d.normalize()
+  ik.pole.copy(ik.e).sub(ik.s); ik.pole.addScaledVector(ik.d, -ik.pole.dot(ik.d)).normalize()
+  const cos = (a * a + dist * dist - b * b) / (2 * a * dist)
+  ik.e2.copy(ik.s).addScaledVector(ik.d, a * cos).addScaledVector(ik.pole, a * Math.sqrt(Math.max(0, 1 - cos * cos)))
+  ik.q.setFromUnitVectors(ik.a.copy(ik.e).sub(ik.s).normalize(), ik.b.copy(ik.e2).sub(ik.s).normalize())
+  rotateWorld(upper, ik.id.identity().slerp(ik.q, weight).clone())
+  lower.getWorldPosition(ik.e); hand.getWorldPosition(ik.w)
+  ik.q.setFromUnitVectors(ik.a.copy(ik.w).sub(ik.e).normalize(), ik.b.copy(ik.s).addScaledVector(ik.d, dist).sub(ik.e).normalize())
+  rotateWorld(lower, ik.id.identity().slerp(ik.q, weight).clone())
+}
+
 const only = (clip, keep, name) => new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => keep(bone(t))))
 
 // A seated character from the Meshy rigs: an eight-second typing loop, and a short wave on hover.
-function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, neck = 0.82, still = false, ...props }) {
+function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, neck = 0.82, still = false, pets = false, ...props }) {
   const { scene, animations } = useGLTF(model, false, true)
   const actor = useMemo(() => clone(scene), [scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
@@ -110,6 +136,8 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
   const tmp = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), axis: new THREE.Vector3(),
     f: new THREE.Vector3(), v: new THREE.Vector3(), w: new THREE.Vector3() }), [])
   const chest = useMemo(() => actor.getObjectByName('Spine'), [actor])
+  const arms = useMemo(() => ['Left', 'Right'].map((side) => ['Arm', 'ForeArm', 'Hand'].map((b) => actor.getObjectByName(side + b))), [actor])
+  const pet = useMemo(() => ({ target: new THREE.Vector3(), shoulder: new THREE.Vector3() }), [])
   const glance = useRef({ t: 9, next: 6 + phase * 4 + Math.random() * 8, camera: false })
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)'), [])
   const [hover, setHover] = useState(false)
@@ -178,7 +206,8 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     // The typing clip has no head or neck keys, so the mixer leaves those bones alone: put back last
     // frame's untilted pose first, or the tilt would add up frame after frame.
     if (headTilt) for (const [b, , untilted] of neckBones) b.quaternion.copy(untilted)
-    speed.current += ((still ? 0 : 1) - speed.current) * (1 - Math.exp(-dt * 4))
+    const petting = pets ? catPet.weight : 0 // the cat is sitting by her: she stops typing and strokes its head
+    speed.current += ((still || petting > 0.3 ? 0 : 1) - speed.current) * (1 - Math.exp(-dt * 4))
     mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05) * speed.current)
     if (!headTilt || reduced.matches) return
     const t = clock.elapsedTime + phase * 1.7
@@ -195,7 +224,7 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     const waving = actions.current.wave?.isRunning()
     const g = glance.current
     g.next -= dt
-    if (still) g.next = Math.max(g.next, 3) // eyes on the screen, no glances away
+    if (still || petting > 0.01) g.next = Math.max(g.next, 3) // eyes on the screen (or the cat), no glances away
     if (g.next <= 0 && !waving) Object.assign(g, { t: 0, next: 14 + Math.random() * 16, camera: Math.random() < 0.4 })
     g.t += dt
     const look = waving ? 0 : Math.min(1, g.t / 0.4, Math.max(0, (2.4 - g.t) / 0.5))
@@ -213,10 +242,25 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
       yaw = Math.atan2(forward.x * to.z - forward.z * to.x, forward.x * to.x + forward.z * to.z) * 0.6 * toCamera
       yaw = THREE.MathUtils.clamp(yaw, -0.7, 0.7)
     }
+    if (petting > 0.001) { // and turns to look at the cat
+      actor.getWorldPosition(tmp.v)
+      const to = tmp.w.copy(catPet.target).sub(tmp.v).setY(0).normalize()
+      yaw += THREE.MathUtils.clamp(Math.atan2(forward.x * to.z - forward.z * to.x, forward.x * to.x + forward.z * to.z), -0.8, 0.8) * 0.7 * petting
+    }
     for (const [b, share, untilted] of neckBones) {
       untilted.copy(b.quaternion)
       turn(b, tmp.axis, headTilt * share * tilt.current - 0.06 * share * lift) // a little above level when looking up
       if (yaw) turn(b, UP, yaw * share)
+    }
+
+    // Stroking: the hand nearer the cat comes to rest on its head and runs back over it, slowly, again and again.
+    if (petting > 0.001 && arms[0][0]) {
+      actor.updateMatrixWorld(true)
+      const stroke = 0.5 - 0.5 * Math.cos(t * 2.2)
+      pet.target.copy(catPet.target).add(tmp.v.set(0, 0.12 - 0.03 * stroke, -0.05 * stroke))
+      const [upper, lower, hand] = arms.reduce((best, arm) =>
+        arm[0].getWorldPosition(pet.shoulder).distanceTo(pet.target) < best[0].getWorldPosition(tmp.w).distanceTo(pet.target) ? arm : best)
+      reach(upper, lower, hand, pet.target, THREE.MathUtils.smoothstep(petting, 0, 1))
     }
   })
 
@@ -268,7 +312,7 @@ function Seat({ who, cast, intro, phase }) {
   const show = useStore((st) => who === 'designer' && st.active === 'projects' ? st.preview ?? st.showcase ?? 0 : null)
   return (
     <>
-      <SeatedPerson model={url(MODELS[cast][who])} name={MODELS[cast][who]} intro={intro} peekId={who} phase={phase} still={show !== null} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
+      <SeatedPerson model={url(MODELS[cast][who])} name={MODELS[cast][who]} intro={intro} peekId={who} phase={phase} still={show !== null} pets={who === 'designer'} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
         position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
       <Prop src={PROP.laptop} screen={who === 'developer' ? 'code' : 'design'} show={show} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />

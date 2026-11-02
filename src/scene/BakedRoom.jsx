@@ -133,6 +133,7 @@ function convert(scene, albedo, warm, nightMap) {
       o.geometry = o.geometry.toNonIndexed()
       o.geometry.computeVertexNormals()
       o.material = glossyMaterial({ map: old.map, warm: second.warm, nightMap: second.night, scales, tint: web_tint })
+      roomLight.meshes.push({ mesh: o, channel: 1, scales }) // the desk top, for the cat when she sits on it
     } else if (o.name.startsWith('Textured')) {
       if (old.map) old.map.anisotropy = 8
       o.material = bakedMaterial({ map: old.map, warm: second.warm, nightMap: second.night, scales, cutout: web_cutout })
