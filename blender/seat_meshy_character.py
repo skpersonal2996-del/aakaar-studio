@@ -517,6 +517,24 @@ for b in arm_bones:  # settle back into the typing pose
         if fc.data_path == f'pose.bones["{b}"].rotation_quaternion':
             fc.keyframe_points.insert(78, fc.keyframe_points[0].co[1])
 
+# --- elbows ---------------------------------------------------------------------------------------------
+# Typing bends the forearms up hard; Meshy's weights switch from upper arm to forearm in a narrow band, so the
+# inner elbow folds into itself and the sleeve's inside shows as a dark striped gash. Smoothing the weights within
+# 8 cm of each elbow spreads the bend out (wider or stronger tears the sleeve elsewhere). The classic girl's sleeves
+# fold cleanly already, and smoothing hers opens shards in the forearm instead, so she keeps her own weights.
+if name != 'girl':
+    co = np.array([tuple(v.co) for v in mesh.data.vertices])
+    near_elbow = np.zeros(len(co), bool)
+    for side in ('Left', 'Right'):
+        e = np.array(tuple(mesh.matrix_world.inverted() @ world(D[f'{side}ForeArm'].head_local)))
+        near_elbow |= np.linalg.norm(co - e, axis=1) < .08 * local
+    mesh.data.vertices.foreach_set('select', near_elbow)
+    bpy.ops.object.select_all(action='DESELECT'); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.mode_set(mode='WEIGHT_PAINT'); mesh.data.use_paint_mask_vertex = True
+    bpy.ops.object.vertex_group_smooth(group_select_mode='BONE_DEFORM', factor=.6, repeat=20)
+    mesh.data.use_paint_mask_vertex = False; bpy.ops.object.mode_set(mode='OBJECT')
+    print('ELBOWS smoothed', int(near_elbow.sum()), 'vertices', flush=True)
+
 # --- armpit slivers -----------------------------------------------------------------------------------
 # Meshy's meshes carry thin flaps at the armpits (folds and hair ends tucked between arm and body). Hidden at rest,
 # the typing pose stretches them into dark shards cutting out of the sweater. Faces near shoulder height that the

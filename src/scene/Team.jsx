@@ -97,13 +97,14 @@ function fabricMaterial(old, neckHeight, blush) {
 const only = (clip, keep, name) => new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => keep(bone(t))))
 
 // A seated character from the Meshy rigs: an eight-second typing loop, and a short wave on hover.
-function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, neck = 0.82, ...props }) {
+function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, neck = 0.82, still = false, ...props }) {
   const { scene, animations } = useGLTF(model, false, true)
   const actor = useMemo(() => clone(scene), [scene])
   const mixer = useMemo(() => new THREE.AnimationMixer(actor), [actor])
   const actions = useRef({})
   const tilt = useRef(1)
   const greet = useRef(0)
+  const speed = useRef(1) // the typing slows to a stop while the work on her screen is being viewed
   const neckBones = useMemo(() => TILT_SHARE.map(([name, share]) => [actor.getObjectByName(name), share])
     .filter(([b]) => b).map(([b, share]) => [b, share, b.quaternion.clone()]), [actor])
   const tmp = useMemo(() => ({ q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), axis: new THREE.Vector3(),
@@ -177,7 +178,8 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     // The typing clip has no head or neck keys, so the mixer leaves those bones alone: put back last
     // frame's untilted pose first, or the tilt would add up frame after frame.
     if (headTilt) for (const [b, , untilted] of neckBones) b.quaternion.copy(untilted)
-    mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05))
+    speed.current += ((still ? 0 : 1) - speed.current) * (1 - Math.exp(-dt * 4))
+    mixer.update(reduced.matches ? 0 : Math.min(delta, 0.05) * speed.current)
     if (!headTilt || reduced.matches) return
     const t = clock.elapsedTime + phase * 1.7
     actor.getWorldQuaternion(tmp.p)
@@ -193,6 +195,7 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     const waving = actions.current.wave?.isRunning()
     const g = glance.current
     g.next -= dt
+    if (still) g.next = Math.max(g.next, 3) // eyes on the screen, no glances away
     if (g.next <= 0 && !waving) Object.assign(g, { t: 0, next: 14 + Math.random() * 16, camera: Math.random() < 0.4 })
     g.t += dt
     const look = waving ? 0 : Math.min(1, g.t / 0.4, Math.max(0, (2.4 - g.t) / 0.5))
@@ -200,10 +203,10 @@ function SeatedPerson({ model, name, intro, peekId, phase = 0, headTilt = 0, nec
     // While waving they look round at the visitor, easing in and back out with the wave.
     const ease = 1 - Math.exp(-dt * 6)
     greet.current += ((waving ? 1 : 0) - greet.current) * ease
-    const lift = Math.max(glancing, greet.current)
-    tilt.current += ((waving ? 0 : 1 - glancing) - tilt.current) * ease
+    const lift = glancing // the glance lifts the head a little above level; the greeting keeps half the bow
+    tilt.current += ((waving ? 0.5 : 1 - glancing) - tilt.current) * ease
     let yaw = 0
-    const toCamera = Math.max(g.camera ? glancing : 0, greet.current)
+    const toCamera = Math.max(g.camera ? glancing : 0, 0.75 * greet.current)
     if (toCamera > 0.001) {
       actor.getWorldPosition(tmp.v)
       const to = tmp.w.copy(camera.position).sub(tmp.v).setY(0).normalize()
@@ -265,7 +268,7 @@ function Seat({ who, cast, intro, phase }) {
   const show = useStore((st) => who === 'designer' && st.active === 'projects' ? st.preview ?? st.showcase ?? 0 : null)
   return (
     <>
-      <SeatedPerson model={url(MODELS[cast][who])} name={MODELS[cast][who]} intro={intro} peekId={who} phase={phase} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
+      <SeatedPerson model={url(MODELS[cast][who])} name={MODELS[cast][who]} intro={intro} peekId={who} phase={phase} still={show !== null} headTilt={HEAD_TILT[cast]} neck={cast === 'chibi' ? 0.62 : 0.82}
         position={s.person} rotation-y={s.rotation} />
       <Prop src={PROP.chair} position={s.chair} rotation-y={s.chairRotation} />
       <Prop src={PROP.laptop} screen={who === 'developer' ? 'code' : 'design'} show={show} position={s.laptop} rotation-y={s.laptopRotation} scale={s.laptopScale} />

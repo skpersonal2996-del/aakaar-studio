@@ -137,4 +137,70 @@ function Software() {
   )
 }
 
-export const SERVICE_ART = { website: Website, apps: Apps, software: Software }
+// Your documents and data feeding an AI model, which answers inside your own app.
+function Ai() {
+  const sources = [
+    { y: 24, color: C.amber, glyph: 'doc' },
+    { y: 62, color: C.teal, glyph: 'data' },
+    { y: 100, color: C.pink, glyph: 'api' },
+  ]
+  const spark = (cx, cy, r) =>
+    `M${cx} ${cy - r} C ${cx + r * 0.18} ${cy - r * 0.18}, ${cx + r * 0.18} ${cy - r * 0.18}, ${cx + r} ${cy} C ${cx + r * 0.18} ${cy + r * 0.18}, ${cx + r * 0.18} ${cy + r * 0.18}, ${cx} ${cy + r} C ${cx - r * 0.18} ${cy + r * 0.18}, ${cx - r * 0.18} ${cy + r * 0.18}, ${cx - r} ${cy} C ${cx - r * 0.18} ${cy - r * 0.18}, ${cx - r * 0.18} ${cy - r * 0.18}, ${cx} ${cy - r}Z`
+  return (
+    <svg viewBox="0 0 320 150" role="img" aria-label="Illustration of documents and data flowing through an AI model into an app">
+      {sources.map(({ y, color, glyph }) => (
+        <g key={y}>
+          <rect x="18" y={y} width="34" height="26" rx="6" fill={C.panel} stroke={C.line} />
+          {glyph === 'doc' && (
+            <g stroke={color} strokeWidth="1.6" fill="none" strokeLinejoin="round">
+              <path d={`M29 ${y + 5} h9 l5 5 v12 h-14z`} />
+              <line x1="32" y1={y + 15} x2="40" y2={y + 15} />
+              <line x1="32" y1={y + 19} x2="38" y2={y + 19} />
+            </g>
+          )}
+          {glyph === 'data' && (
+            <g stroke={color} strokeWidth="1.6" fill="none">
+              <ellipse cx="35" cy={y + 8} rx="8" ry="3" />
+              <path d={`M27 ${y + 8} v10 c0 4 16 4 16 0 v-10`} />
+              <path d={`M27 ${y + 13} c0 4 16 4 16 0`} />
+            </g>
+          )}
+          {glyph === 'api' && (
+            <g stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points={`31,${y + 8} 26,${y + 13} 31,${y + 18}`} />
+              <polyline points={`39,${y + 8} 44,${y + 13} 39,${y + 18}`} />
+            </g>
+          )}
+          <path d={`M52 ${y + 13} C 76 ${y + 13}, 76 75, 98 75`} fill="none" stroke={color} strokeWidth="2" strokeDasharray="4 5" className="art-flow" opacity="0.8" />
+        </g>
+      ))}
+      {/* the model */}
+      <rect x="98" y="51" width="48" height="48" rx="14" fill="url(#aiCore)" />
+      <path d={spark(122, 75, 13)} fill={C.cream} />
+      <path d={spark(135, 62, 4)} fill="rgba(255,255,255,0.8)" />
+      <path d="M146 75 H 168" stroke={C.cream} strokeWidth="2" strokeDasharray="4 5" className="art-flow" opacity="0.6" />
+      {/* the app, answering */}
+      <g className="art-float">
+        <rect x="168" y="18" width="134" height="114" rx="10" fill={C.frame} stroke={C.line} />
+        <rect x="178" y="28" width="44" height="6" rx="3" fill={C.cream} />
+        <rect x="236" y="44" width="56" height="16" rx="8" fill={C.panel} />
+        <rect x="244" y="50" width="38" height="4" rx="2" fill={C.line} />
+        <rect x="178" y="68" width="100" height="36" rx="9" fill="rgba(255,111,174,0.16)" stroke="rgba(255,111,174,0.4)" />
+        <path d={spark(189, 79, 5)} fill={C.pink} />
+        <rect x="198" y="76" width="68" height="4" rx="2" fill={C.cream} opacity="0.8" />
+        <rect x="186" y="86" width="78" height="4" rx="2" fill={C.line} />
+        <rect x="186" y="94" width="54" height="4" rx="2" fill={C.line} />
+        <rect x="178" y="112" width="114" height="12" rx="6" fill={C.panel} />
+        <circle cx="284" cy="118" r="3" fill={C.amber} />
+      </g>
+      <defs>
+        <linearGradient id="aiCore" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={C.amber} />
+          <stop offset="1" stopColor={C.pink} />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+export const SERVICE_ART = { website: Website, apps: Apps, software: Software, ai: Ai }

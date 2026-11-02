@@ -149,6 +149,7 @@ export const STORY = [
 
 // art: which illustration sits on the card (see src/ui/ServiceArt.jsx)
 export const SERVICES = [
+  { name: 'AI development & integration', art: 'ai', text: 'Put AI to work on your own documents and data: assistants, automations and smart features built into the tools you already use.' },
   { name: 'Websites & landing pages', art: 'website', text: 'Give your business a home online, tell your story, and make it easier for the right people to find you.' },
   { name: 'Mobile & web apps', art: 'apps', text: 'Turn an idea into a useful experience people can actually use.' },
   { name: 'Custom software & SaaS', art: 'software', text: 'Replace clunky workflows and disconnected tools with software built around how your business works.' },

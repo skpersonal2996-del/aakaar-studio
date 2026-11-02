@@ -50,7 +50,7 @@ export const VIEWS = {
   contact: { pos: [0.25, 1.4, 2.35], target: [-0.1, 0.78, 1.32] },
 }
 // A project opened from the list: close in over Shruti's shoulder onto her laptop, which shows it.
-export const SHOWCASE = { pos: [2.0, 1.65, 1.45], target: [1.27, 0.86, 0.78] }
+export const SHOWCASE = { pos: [1.85, 1.62, 1.32], target: [1.22, 0.86, 0.76] }
 
 // Gentle close-ups that don't open a panel.
 export const PEEKS = {

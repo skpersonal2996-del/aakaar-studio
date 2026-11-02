@@ -40,23 +40,32 @@ function floorLight() {
   const maps = [pixels(roomLight.warm), pixels(roomLight.night)]
   const ray = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 1)
   const meshes = roomLight.meshes.map((m) => m.mesh)
-  const channel = new Map(roomLight.meshes.map((m) => [m.mesh, m.channel]))
+  const info = new Map(roomLight.meshes.map((m) => [m.mesh, m]))
   let last = [new THREE.Color(0.4, 0.3, 0.25), new THREE.Color(0.2, 0.15, 0.2)]
-  return Array.from({ length: SAMPLES }, (_, i) => {
+  const raw = Array.from({ length: SAMPLES }, (_, i) => {
     const p = PATH.getPointAt(i / SAMPLES)
     ray.ray.origin.set(p.x, 0.5, p.z)
     const hit = ray.intersectObjects(meshes, false)[0]
-    const uv = hit && (channel.get(hit.object) ? hit.uv1 : hit.uv)
+    const m = hit && info.get(hit.object)
+    const uv = m && (m.channel ? hit.uv1 : hit.uv)
     if (uv) {
-      last = maps.map(({ data, size }, k) => {
+      const lit = maps.map(({ data, size }, k) => {
         const x = Math.min(size - 1, Math.max(0, Math.floor(uv.x * size)))
         const y = Math.min(size - 1, Math.max(0, Math.floor(uv.y * size)))
-        const j = (y * size + x) * 4, k2 = roomLight.scales[k] * roomLight.exposure
+        const j = (y * size + x) * 4, k2 = (m.scales || roomLight.scales)[k] * roomLight.exposure // each surface's own scale
         return new THREE.Color(toLinear(data[j] / 255) * k2, toLinear(data[j + 1] / 255) * k2, toLinear(data[j + 2] / 255) * k2)
       })
+      if (lit[0].r + lit[0].g + lit[0].b > 0.02) last = lit // a black texel is an atlas seam, not shade
     }
     return last
   })
+  // Averaged along the path (about half a metre either way), so the fur never jumps between neighbouring texels.
+  const R = 8
+  return raw.map((_, i) => [0, 1].map((k) => {
+    const c = new THREE.Color(0, 0, 0)
+    for (let d = -R; d <= R; d++) c.add(raw[(i + d + SAMPLES) % SAMPLES][k])
+    return c.multiplyScalar(1 / (2 * R + 1))
+  }))
 }
 
 // Clicked, the cat stops, turns towards the visitor, looks up at the camera with her tail wagging and says meow,

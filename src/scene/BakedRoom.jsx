@@ -136,12 +136,12 @@ function convert(scene, albedo, warm, nightMap) {
     } else if (o.name.startsWith('Textured')) {
       if (old.map) old.map.anisotropy = 8
       o.material = bakedMaterial({ map: old.map, warm: second.warm, nightMap: second.night, scales, cutout: web_cutout })
-      roomLight.meshes.push({ mesh: o, channel: 1 }) // the rugs, among the textured props
+      roomLight.meshes.push({ mesh: o, channel: 1, scales }) // the rugs, among the textured props
       if (!old.map) o.material.color.copy(old.color) // plain parts of a textured prop
     } else {
       o.material = bakedMaterial({ map: albedo, warm, nightMap, scales })
       Object.assign(roomLight, { warm, night: nightMap, scales })
-      roomLight.meshes.push({ mesh: o, channel: 0 })
+      roomLight.meshes.push({ mesh: o, channel: 0, scales })
     }
     if (o.geometry.attributes._wind) sway(o.material)
     old.dispose()
